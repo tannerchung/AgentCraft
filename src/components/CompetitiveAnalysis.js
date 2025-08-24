@@ -5,18 +5,32 @@ import axios from 'axios';
 const CompetitiveAnalysis = () => {
   const [analysis, setAnalysis] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
   const [selectedCompetitor, setSelectedCompetitor] = useState('AgentForce');
 
   const runCompetitiveAnalysis = async () => {
     setIsLoading(true);
+    setError(null); // Clear previous errors
     try {
       const response = await axios.post('/api/competitive-analysis', {
         competitor: selectedCompetitor,
         focus_areas: ['pricing', 'capabilities', 'limitations']
       });
       setAnalysis(response.data);
-    } catch (error) {
-      console.error('Competitive analysis failed:', error);
+    } catch (err) {
+      console.error('Competitive analysis failed:', err);
+      if (err.response) {
+        // The request was made and the server responded with a status code
+        // that falls out of the range of 2xx
+        setError(`Error: ${err.response.data.detail || err.response.statusText}`);
+      } else if (err.request) {
+        // The request was made but no response was received
+        setError('Network Error: Could not connect to the analysis service. Please ensure the backend is running.');
+      } else {
+        // Something happened in setting up the request that triggered an Error
+        setError(`Error: ${err.message}`);
+      }
+      setAnalysis(null); // Clear any partial analysis data on error
     } finally {
       setIsLoading(false);
     }
@@ -33,6 +47,13 @@ const CompetitiveAnalysis = () => {
         </p>
       </div>
 
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-6" role="alert">
+          <strong className="font-bold">Oh no!</strong>
+          <span className="block sm:inline ml-2">{error}</span>
+        </div>
+      )}
+
       <div className="mb-6">
         <select
           value={selectedCompetitor}
@@ -43,7 +64,7 @@ const CompetitiveAnalysis = () => {
           <option value="HubSpot">HubSpot Service Hub</option>
           <option value="Zendesk">Zendesk Answer Bot</option>
         </select>
-        
+
         <button
           onClick={runCompetitiveAnalysis}
           disabled={isLoading}
@@ -60,7 +81,7 @@ const CompetitiveAnalysis = () => {
             <CheckCircle className="h-6 w-6 text-green-600 mr-2" />
             <h3 className="text-lg font-semibold text-green-800">Our Capability</h3>
           </div>
-          
+
           {analysis && analysis.our_capability ? (
             <div className="space-y-4">
               {analysis.our_capability.cost_comparison && (
@@ -95,7 +116,7 @@ const CompetitiveAnalysis = () => {
               </div>
             </div>
           ) : (
-            <p className="text-gray-500">Run analysis to see our competitive intelligence capabilities</p>
+            !isLoading && <p className="text-gray-500">Run analysis to see our competitive intelligence capabilities</p>
           )}
         </div>
 
@@ -105,7 +126,7 @@ const CompetitiveAnalysis = () => {
             <X className="h-6 w-6 text-red-600 mr-2" />
             <h3 className="text-lg font-semibold text-red-800">AgentForce Response</h3>
           </div>
-          
+
           <div className="space-y-4">
             <div className="bg-red-100 p-4 rounded-lg border border-red-300">
               <div className="flex items-start">
