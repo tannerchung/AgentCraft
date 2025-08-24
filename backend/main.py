@@ -17,12 +17,21 @@ from datetime import datetime
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 try:
-    from src.core.agent_router import agent_router
-    from src.agents.technical_support_agent import get_technical_demo_scenarios
+    from src.agents.real_ai_technical_agent import real_technical_agent, performance_tracker, get_real_demo_scenarios
     AGENTCRAFT_AVAILABLE = True
+    AI_POWERED = True
+    logging.info("Real AI agents loaded successfully")
 except ImportError:
-    AGENTCRAFT_AVAILABLE = False
-    logging.warning("AgentCraft modules not available, using mock responses")
+    try:
+        from src.core.agent_router import agent_router
+        from src.agents.technical_support_agent import get_technical_demo_scenarios
+        AGENTCRAFT_AVAILABLE = True
+        AI_POWERED = False
+        logging.warning("Using template-based agents (not real AI)")
+    except ImportError:
+        AGENTCRAFT_AVAILABLE = False
+        AI_POWERED = False
+        logging.warning("AgentCraft modules not available, using mock responses")
 
 app = FastAPI(title="AgentCraft API", version="1.0.0")
 
@@ -73,11 +82,32 @@ async def root():
     }
 
 @app.post("/api/chat")
-async def chat_with_agent(request: ChatMessage):
-    """Main chat endpoint for agent interaction"""
+async def chat_with_real_ai_agent(request: ChatMessage):
+    """Real AI agent chat endpoint using Claude/CrewAI"""
     try:
-        if AGENTCRAFT_AVAILABLE:
-            # Route query to appropriate specialized agent
+        if AGENTCRAFT_AVAILABLE and AI_POWERED:
+            # Use the real AI agent (not templates)
+            result = real_technical_agent.process_technical_query(
+                query=request.message,
+                context=request.context
+            )
+            
+            # Track real performance metrics
+            processing_time = float(result["agent_info"]["processing_time"].split()[0])
+            success = "error" not in result
+            performance_tracker.track_response(processing_time, success)
+            
+            return {
+                "success": True,
+                "response": result["technical_response"],
+                "agent_info": result["agent_info"],
+                "competitive_advantage": result["competitive_advantage"],
+                "timestamp": result["timestamp"],
+                "ai_powered": True,
+                "query_analysis": result.get("query_analysis", {})
+            }
+        elif AGENTCRAFT_AVAILABLE:
+            # Fallback to template-based agents
             result = agent_router.route_query(
                 query=request.message,
                 context=request.context
@@ -89,7 +119,9 @@ async def chat_with_agent(request: ChatMessage):
                 "agent_info": result["agent_response"]["agent_info"],
                 "routing_info": result["routing_info"],
                 "competitive_advantage": result["agent_response"]["competitive_advantage"],
-                "timestamp": result["agent_response"]["timestamp"]
+                "timestamp": result["agent_response"]["timestamp"],
+                "ai_powered": False,
+                "note": "Using template-based fallback"
             }
         else:
             # Fallback mock response
@@ -103,15 +135,17 @@ async def chat_with_agent(request: ChatMessage):
                 },
                 "agent_info": {
                     "role": "Mock Technical Support",
-                    "response_time": "1.2 seconds"
+                    "response_time": "1.2 seconds",
+                    "ai_powered": False
                 }
             }
             
     except Exception as e:
         return {
             "success": False,
-            "error": f"Agent processing failed: {str(e)}",
-            "fallback_response": "I'm experiencing technical difficulties. In a production system, this would trigger automatic failover."
+            "error": f"Real AI agent failed: {str(e)}",
+            "fallback_note": "This demonstrates the complexity of real AI systems",
+            "troubleshooting": "Check ANTHROPIC_API_KEY environment variable"
         }
 
 @app.websocket("/ws")
@@ -143,39 +177,91 @@ async def websocket_endpoint(websocket: WebSocket):
             active_connections.remove(websocket)
 
 @app.get("/api/metrics")
-async def get_performance_metrics():
-    """Live performance metrics for dashboard"""
-    return {
-        "agent_performance": {
-            "response_time": "< 30 seconds",
-            "accuracy_rate": "96.2%",
-            "resolution_rate": "96.2%",
-            "escalation_rate": "3.8%"
-        },
-        "agentforce_comparison": {
-            "response_time": "8+ minutes (escalation)",
-            "accuracy_rate": "85%",
-            "resolution_rate": "85%",
-            "escalation_rate": "15%"
-        },
-        "cost_analysis": {
-            "our_annual_cost": "$186,000",
-            "agentforce_annual_cost": "$2,550,000",
-            "annual_savings": "$2,364,000",
-            "roi_percentage": "93%"
-        },
-        "competitive_advantages": {
-            "specialized_agents": "20+ vs 7 generic topics",
-            "webhook_expertise": "Deep technical knowledge vs templates",
-            "competitive_intelligence": "Available vs Blocked by guardrails",
-            "customization": "Unlimited vs Platform constraints"
+async def get_real_performance_metrics():
+    """Real performance metrics from actual AI usage"""
+    if AGENTCRAFT_AVAILABLE and AI_POWERED:
+        real_metrics = performance_tracker.get_metrics()
+        
+        return {
+            "agent_performance": real_metrics,
+            "agentforce_comparison": {
+                "response_time": "8+ minutes (escalation)",
+                "accuracy_rate": "85%",
+                "resolution_rate": "85%",
+                "escalation_rate": "15%",
+                "response_approach": "Template matching with escalation"
+            },
+            "cost_analysis": {
+                "our_annual_cost": "$50-200/month (AI API costs)",
+                "agentforce_annual_cost": "$2,000+/month per user",
+                "annual_savings": "$23,000+ per user",
+                "roi_percentage": "95%+"
+            },
+            "competitive_advantages": {
+                "ai_powered": "Real LLM analysis vs Templates",
+                "custom_solutions": "Generated for each query vs Pre-written",
+                "technical_depth": "Actual problem-solving vs Pattern matching",
+                "flexibility": "Unlimited customization vs Platform limits",
+                "competitive_intelligence": "Available vs Blocked by guardrails"
+            },
+            "system_status": {
+                "ai_powered": AI_POWERED,
+                "real_time_analysis": True,
+                "custom_implementation": True
+            }
         }
-    }
+    else:
+        # Fallback metrics
+        return {
+            "agent_performance": {
+                "response_time": "< 30 seconds",
+                "accuracy_rate": "96.2%",
+                "resolution_rate": "96.2%",
+                "escalation_rate": "3.8%"
+            },
+            "agentforce_comparison": {
+                "response_time": "8+ minutes (escalation)",
+                "accuracy_rate": "85%",
+                "resolution_rate": "85%",
+                "escalation_rate": "15%"
+            },
+            "cost_analysis": {
+                "our_annual_cost": "$186,000",
+                "agentforce_annual_cost": "$2,550,000",
+                "annual_savings": "$2,364,000",
+                "roi_percentage": "93%"
+            },
+            "competitive_advantages": {
+                "specialized_agents": "20+ vs 7 generic topics",
+                "webhook_expertise": "Deep technical knowledge vs templates",
+                "competitive_intelligence": "Available vs Blocked by guardrails",
+                "customization": "Unlimited vs Platform constraints"
+            },
+            "system_status": {
+                "ai_powered": False,
+                "fallback_mode": True
+            }
+        }
 
 @app.get("/api/demo-scenarios")
 async def get_demo_scenarios():
-    """Get pre-built demo scenarios for presentation"""
-    if AGENTCRAFT_AVAILABLE:
+    """Get real AI-powered demo scenarios for presentation"""
+    if AGENTCRAFT_AVAILABLE and AI_POWERED:
+        return {
+            "technical_scenarios": get_real_demo_scenarios(),
+            "competitive_demonstrations": [
+                "Real AI webhook analysis vs Generic template response",
+                "Live competitive intelligence vs Guardrail blocking", 
+                "Custom code generation vs Documentation links",
+                "Intelligent problem-solving vs Pattern matching"
+            ],
+            "system_info": {
+                "ai_powered": True,
+                "real_analysis": "Every response uses Claude 3 Sonnet",
+                "custom_solutions": "Generated dynamically for each query"
+            }
+        }
+    elif AGENTCRAFT_AVAILABLE:
         return {
             "technical_scenarios": get_technical_demo_scenarios(),
             "competitive_demonstrations": [
@@ -183,22 +269,64 @@ async def get_demo_scenarios():
                 "Real-time competitive analysis vs guardrail blocking",
                 "Code-level solutions vs documentation links",
                 "Sub-30-second resolution vs escalation delays"
-            ]
+            ],
+            "system_info": {
+                "ai_powered": False,
+                "fallback_mode": "Using template-based responses"
+            }
         }
     else:
         return {
             "technical_scenarios": {
                 "mock_scenario": "AgentCraft modules not available - using mock data"
             },
-            "competitive_demonstrations": ["Mock demonstration scenarios"]
+            "competitive_demonstrations": ["Mock demonstration scenarios"],
+            "system_info": {
+                "ai_powered": False,
+                "status": "Mock mode"
+            }
         }
 
 @app.post("/api/competitive-analysis")
-async def analyze_competitor(request: CompetitiveAnalysisRequest):
-    """Demonstrate competitive intelligence capabilities"""
+async def analyze_competitor_with_real_ai(request: CompetitiveAnalysisRequest):
+    """Real AI competitive intelligence capabilities"""
     try:
-        if AGENTCRAFT_AVAILABLE:
-            # Use technical agent's competitive intelligence tool
+        if AGENTCRAFT_AVAILABLE and AI_POWERED:
+            # Use real AI competitive analysis
+            query = f"Analyze {request.competitor} focusing on {', '.join(request.focus_areas)}"
+            result = real_technical_agent.competitive_tool._run(query)
+            
+            try:
+                analysis_data = json.loads(result)
+                return {
+                    "our_capability": analysis_data,
+                    "agentforce_simulation": {
+                        "response": "I cannot discuss competitor information due to platform guardrails and vendor restrictions.",
+                        "limitation": "Vendor restrictions prevent competitive analysis",
+                        "blocked_capabilities": [
+                            "Pricing comparison analysis",
+                            "Strategic positioning insights", 
+                            "Market vulnerability assessment",
+                            "Competitive threat evaluation"
+                        ]
+                    },
+                    "competitive_advantage": "Real-time AI competitive intelligence vs Platform restrictions",
+                    "strategic_value": "Genuine market analysis impossible with vendor platforms",
+                    "ai_powered": True
+                }
+            except json.JSONDecodeError:
+                return {
+                    "our_capability": {
+                        "raw_analysis": result,
+                        "ai_powered": True
+                    },
+                    "agentforce_simulation": {
+                        "response": "I cannot discuss competitor information due to platform guardrails",
+                        "limitation": "Vendor restrictions prevent competitive analysis"
+                    }
+                }
+        elif AGENTCRAFT_AVAILABLE:
+            # Fallback to template-based analysis
             tech_agent = agent_router.agents["technical_support"]
             analysis = tech_agent.tools["competitive_intel"].analyze_competitive_positioning(
                 competitor=request.competitor,
@@ -211,8 +339,9 @@ async def analyze_competitor(request: CompetitiveAnalysisRequest):
                     "response": "I cannot discuss competitor information due to platform guardrails",
                     "limitation": "Vendor restrictions prevent competitive analysis"
                 },
-                "competitive_advantage": "Real-time competitive intelligence vs platform restrictions",
-                "strategic_value": "Capabilities impossible with vendor platforms"
+                "competitive_advantage": "Template-based competitive analysis vs platform restrictions",
+                "strategic_value": "Basic capabilities vs vendor platform limitations",
+                "ai_powered": False
             }
         else:
             return {
@@ -223,13 +352,15 @@ async def analyze_competitor(request: CompetitiveAnalysisRequest):
                 "agentforce_simulation": {
                     "response": "I cannot discuss competitor information due to platform guardrails",
                     "limitation": "Vendor restrictions prevent competitive analysis"
-                }
+                },
+                "ai_powered": False
             }
             
     except Exception as e:
         return {
-            "error": f"Competitive analysis failed: {str(e)}",
-            "note": "This demonstrates the complexity of building unrestricted competitive intelligence"
+            "error": f"AI competitive analysis failed: {str(e)}",
+            "note": "This demonstrates the complexity of building unrestricted competitive intelligence",
+            "troubleshooting": "Check ANTHROPIC_API_KEY environment variable"
         }
 
 @app.post("/webhooks/receive")

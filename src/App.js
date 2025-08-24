@@ -4,13 +4,15 @@ import Dashboard from './components/Dashboard';
 import AgentChat from './components/AgentChat';
 import CompetitiveAnalysis from './components/CompetitiveAnalysis';
 import MultiAgentDemo from './components/MultiAgentDemo';
-import { Activity, MessageSquare, TrendingUp, Users } from 'lucide-react';
+import AgentDemo from './components/AgentDemo';
+import { Activity, MessageSquare, TrendingUp, Users, Bot } from 'lucide-react';
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
 
   const tabs = [
     { id: 'dashboard', name: 'Dashboard', icon: Activity },
+    { id: 'agent-demo', name: 'Live Agent Demo', icon: Bot },
     { id: 'chat', name: 'Agent Chat', icon: MessageSquare },
     { id: 'competitive', name: 'Competitive Analysis', icon: TrendingUp },
     { id: 'multi-agent', name: 'Multi-Agent Demo', icon: Users },
@@ -20,6 +22,8 @@ function App() {
     switch (activeTab) {
       case 'dashboard':
         return <Dashboard />;
+      case 'agent-demo':
+        return <AgentDemo />;
       case 'chat':
         return <AgentChat />;
       case 'competitive':

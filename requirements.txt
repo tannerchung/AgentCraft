@@ -1,0 +1,19 @@
+# Core AI Agent Dependencies
+crewai>=0.1.0
+anthropic>=0.18.0
+openai>=1.0.0  # Alternative to Anthropic
+
+# Environment Management
+python-dotenv>=1.0.0
+
+# Web Framework
+fastapi>=0.100.0
+uvicorn>=0.20.0
+requests>=2.30.0
+
+# Core Python
+pydantic>=2.0.0
+python-multipart>=0.0.6
+
+# Optional: OpenAI alternative
+# openai-python>=0.27.0
