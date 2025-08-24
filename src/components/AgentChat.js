@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Clock, CheckCircle } from 'lucide-react';
+import { Send, Bot, User, CheckCircle } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { useAgentChat } from '../hooks/useAgentChat';
 
