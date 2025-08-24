@@ -82,6 +82,7 @@ def start_frontend():
     env['REACT_APP_API_URL'] = 'http://localhost:8000'
     env['PORT'] = '3000'
     env['HOST'] = '0.0.0.0'
+    env['DANGEROUSLY_DISABLE_HOST_CHECK'] = 'true'
     
     try:
         process = subprocess.Popen(
