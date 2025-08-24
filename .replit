@@ -16,7 +16,7 @@ run = ["python3", "main.py"]
 deploymentTarget = "cloudrun"
 
 [workflows]
-runButton = "Run AgentCraft Demo"
+runButton = "Start React Development"
 
 [[workflows.workflow]]
 name = "Run AgentCraft Demo"
@@ -35,3 +35,12 @@ mode = "sequential"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "streamlit run src/demo/streamlit_dashboard.py --server.port 5000 --server.address 0.0.0.0"
+
+[[workflows.workflow]]
+name = "Start React Development"
+author = 44826427
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python main.py"
