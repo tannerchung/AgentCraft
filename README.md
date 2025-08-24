@@ -24,42 +24,64 @@ AgentCraft is built to demonstrate the value of **specialized expertise** over *
 ```
 agentcraft/
 ├── src/
-│   ├── agents/                    # Specialized agent implementations
-│   │   └── technical_support_agent.py
-│   ├── core/                      # Core framework components
+│   ├── components/                # React frontend components
+│   │   ├── AgentChat.js          # Interactive chat interface
+│   │   ├── CompetitiveAnalysis.js # Competitive intelligence demo
+│   │   ├── Dashboard.js          # Main dashboard
+│   │   └── MultiAgentDemo.js     # Multi-agent orchestration
+│   ├── agents/                   # Specialized agent implementations
+│   │   ├── technical_support_agent.py
+│   │   └── real_ai_technical_agent.py
+│   ├── core/                     # Core framework components
 │   │   ├── base_agent.py         # Abstract base for all agents
 │   │   └── agent_router.py       # Intelligent routing system
-│   ├── tools/                     # Specialized tools and capabilities
+│   ├── tools/                    # Specialized tools and capabilities
 │   │   └── webhook_analysis_tool.py
-│   └── demo/                      # Interactive demonstration
+│   ├── services/                 # Backend services
+│   │   ├── hitl_service.py       # Human-in-the-loop framework
+│   │   └── qdrant_service.py     # Vector database service
+│   └── demo/                     # Streamlit demonstration
 │       └── streamlit_dashboard.py
-├── requirements.txt               # Python dependencies
-├── README.md                     # This file
-└── .env.example                  # Environment configuration template
+├── backend/
+│   └── main.py                   # FastAPI backend server
+├── package.json                  # React frontend dependencies
+├── requirements.txt              # Python dependencies
+└── main.py                      # Application launcher
 ```
 
 ## 🚀 Quick Start
 
-### 1. Install Dependencies
+### Option 1: React + FastAPI Stack (Recommended)
+
+The main application runs a React frontend with FastAPI backend:
+
 ```bash
-pip install crewai openai anthropic streamlit pydantic python-dotenv requests
+# Install frontend dependencies (if needed)
+npm install
+
+# Start the full stack application
+python main.py
 ```
 
-### 2. Configure Environment
+This will start:
+- React frontend on port 3000
+- FastAPI backend on port 8000
+- Interactive demo interface
+
+### Option 2: Streamlit Dashboard
+
+For a simpler demonstration interface:
+
 ```bash
-cp .env.example .env
-# Add your API keys to .env file
+# Run Streamlit version
+python main.py --streamlit
 ```
 
-### 3. Run the Demo
-```bash
-streamlit run src/demo/streamlit_dashboard.py --server.port 5000 --server.address 0.0.0.0
-```
+### 3. Access the Application
 
-### 4. Interact with Specialized Agents
-- Navigate to the web interface
-- Try the demo scenarios or enter custom queries
-- Observe the specialized responses and technical solutions
+- **React Frontend**: http://localhost:3000
+- **API Documentation**: http://localhost:8000/docs
+- **Streamlit Demo**: http://localhost:5000 (if using --streamlit)
 
 ## 🤖 Current Specialized Agents
 
@@ -77,6 +99,28 @@ streamlit run src/demo/streamlit_dashboard.py --server.port 5000 --server.addres
 - "My webhook is failing with SSL certificate verification errors"
 - "I'm getting 401 errors when sending webhooks with HMAC signatures"
 - "How should I implement webhook retry logic with exponential backoff?"
+
+## 🌟 Enhanced Features
+
+### Frontend Components
+- **Interactive Chat Interface**: Real-time agent communication
+- **Competitive Analysis Demo**: Shows platform limitation advantages
+- **Multi-Agent Orchestration**: Demonstrates agent collaboration
+- **Performance Dashboard**: Real-time metrics and analytics
+- **A/B Testing Framework**: Continuous optimization capabilities
+
+### Backend Services
+- **FastAPI REST API**: High-performance async backend
+- **Vector Database Integration**: Semantic search with Qdrant
+- **Human-in-the-Loop (HITL)**: Escalation and learning framework
+- **WebSocket Support**: Real-time communication
+- **Performance Tracking**: Comprehensive analytics
+
+### AI Capabilities
+- **Real AI Integration**: Anthropic Claude and OpenAI GPT support
+- **Template Fallbacks**: Graceful degradation without API keys
+- **Confidence Scoring**: Agent certainty metrics
+- **Context Awareness**: Intelligent query routing
 
 ## 🔧 Technical Implementation
 
@@ -99,14 +143,19 @@ streamlit run src/demo/streamlit_dashboard.py --server.port 5000 --server.addres
 - Extensible tool framework for new capabilities
 - Integration with external APIs and services
 
-### Demo Interface
+### Frontend Architecture
 
-**Streamlit Dashboard**: Professional demonstration interface
-- Interactive query processing
-- Real-time agent selection and routing
-- Performance metrics and confidence scoring
-- Competitive advantage visualization
-- Query history and analysis
+**React Components**: Modern, responsive interface
+- Real-time chat with specialized agents
+- Competitive analysis demonstrations
+- Performance visualization dashboards
+- A/B testing management interface
+
+**API Integration**: Seamless backend communication
+- Axios-based HTTP client
+- WebSocket connections for real-time features
+- Error handling and loading states
+- Optimistic UI updates
 
 ## 📈 Performance Tracking
 
@@ -116,6 +165,7 @@ AgentCraft includes built-in performance tracking to demonstrate effectiveness:
 - **Response Time**: Average processing time for specialized responses
 - **Confidence Scores**: Agent certainty in domain expertise application
 - **Routing Accuracy**: Successful query-to-agent matching rates
+- **User Satisfaction**: Feedback and engagement metrics
 
 ## 🎯 Competitive Positioning
 
@@ -137,19 +187,20 @@ AgentCraft includes built-in performance tracking to demonstrate effectiveness:
 - **Independent Development Cycles**: No vendor roadmap dependencies
 - **Flexible Technology Stack**: Choose optimal tools for each domain
 
-## 🚀 Future Expansion Areas
+## 🚀 Deployment on Replit
 
-**Planned Specialized Agents:**
-- **Database Performance Specialist**: Query optimization, indexing strategies
-- **Security Compliance Expert**: GDPR, SOC2, security audit preparation  
-- **DevOps Integration Specialist**: CI/CD pipeline optimization, deployment strategies
-- **API Design Architect**: RESTful design, GraphQL implementation, rate limiting
+AgentCraft is optimized for Replit deployment:
 
-**Enhanced Capabilities:**
-- **Multi-Agent Collaboration**: Complex problem solving with agent teams
-- **Learning from Interactions**: Continuous improvement from user feedback
-- **Integration Plugins**: Direct connection to enterprise systems
-- **Custom Training Pipelines**: Domain-specific model fine-tuning
+**Automatic Setup:**
+- Dependencies auto-install from package.json and requirements.txt
+- Environment configuration through .env files
+- Port forwarding configured for web access
+
+**Production Ready:**
+- FastAPI backend with proper CORS configuration
+- React build optimization for production
+- Health checks and monitoring endpoints
+- Scalable architecture patterns
 
 ## 🤝 Enterprise Integration
 
@@ -157,8 +208,8 @@ AgentCraft is designed to complement existing enterprise AI platforms:
 
 - **API-First Architecture**: Easy integration with current systems
 - **Microservices Pattern**: Deploy individual agents as needed
-- **Containerized Deployment**: Docker/Kubernetes compatibility
-- **Monitoring Integration**: Plugs into existing observability stacks
+- **RESTful Endpoints**: Standard integration protocols
+- **WebSocket Support**: Real-time communication capabilities
 - **Security Compliance**: Enterprise-grade security and privacy controls
 
 ## 💡 Key Messages
