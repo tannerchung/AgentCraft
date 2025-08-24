@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
 import { Shield, TrendingUp, AlertTriangle, CheckCircle, X } from 'lucide-react';
-import apiService from '../services/api';
+import { apiService } from '../services/api';
 
 const CompetitiveAnalysis = () => {
   const [selectedCompetitor, setSelectedCompetitor] = useState('salesforce');
