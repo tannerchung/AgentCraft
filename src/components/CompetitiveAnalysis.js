@@ -12,7 +12,7 @@ const CompetitiveAnalysis = () => {
     setIsLoading(true);
     setError(null); // Clear previous errors
     try {
-      const response = await axios.post('/api/competitive-analysis', {
+      const response = await axios.post('http://0.0.0.0:8000/api/competitive-analysis', {
         competitor: selectedCompetitor,
         focus_areas: ['pricing', 'capabilities', 'limitations']
       });

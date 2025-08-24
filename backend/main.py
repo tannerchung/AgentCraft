@@ -1,4 +1,3 @@
-
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -91,23 +90,23 @@ async def chat_with_real_ai_agent(request: ChatMessage):
                 query=request.message,
                 context=request.context
             )
-            
+
             # Track real performance metrics
             processing_time = float(result["agent_info"]["processing_time"].split()[0])
             success = "error" not in result
             performance_tracker.track_response(processing_time, success)
-            
+
             # Parse and format the AI analysis if it's a JSON string
             formatted_response = ""
-            
+
             # Get the AI content from the technical response
             ai_content = result["technical_response"].get('ai_analysis', '')
-            
+
             if ai_content:
                 try:
                     # Parse the JSON string from AI analysis
                     parsed = json.loads(ai_content)
-                    
+
                     # Create a nicely formatted markdown response
                     formatted_response = f"""**Technical Diagnosis:**
 {parsed.get('diagnosis', 'Analysis provided')}
@@ -133,12 +132,12 @@ async def chat_with_real_ai_agent(request: ChatMessage):
 {parsed.get('prevention', 'Prevention strategies provided')}
 
 **Estimated Time:** {parsed.get('estimated_fix_time', 'Time estimate provided')}"""
-                    
+
                 except json.JSONDecodeError as e:
                     # If JSON parsing fails, return the raw content but still formatted
                     print(f"JSON parsing error: {e}")
                     formatted_response = f"**AI Technical Analysis:**\n\n{ai_content}\n\n**Response Type:** Real-time AI analysis using Claude 3 Sonnet"
-            
+
             # Check for issue_analysis structure (already parsed JSON)
             elif result["technical_response"].get('issue_analysis'):
                 issue_data = result["technical_response"]['issue_analysis']
@@ -166,10 +165,10 @@ async def chat_with_real_ai_agent(request: ChatMessage):
 {issue_data.get('prevention', 'Prevention strategies provided')}
 
 **Estimated Time:** {issue_data.get('estimated_fix_time', 'Time estimate provided')}"""
-            
+
             else:
                 formatted_response = "AI analysis completed - no structured data available"
-            
+
             return {
                 "success": True,
                 "response": {
@@ -189,7 +188,7 @@ async def chat_with_real_ai_agent(request: ChatMessage):
                 query=request.message,
                 context=request.context
             )
-            
+
             return {
                 "success": True,
                 "response": result["agent_response"]["technical_response"],
@@ -216,7 +215,7 @@ async def chat_with_real_ai_agent(request: ChatMessage):
                     "ai_powered": False
                 }
             }
-            
+
     except Exception as e:
         return {
             "success": False,
@@ -230,22 +229,22 @@ async def websocket_endpoint(websocket: WebSocket):
     """WebSocket endpoint for real-time chat"""
     await websocket.accept()
     active_connections.append(websocket)
-    
+
     try:
         while True:
             data = await websocket.receive_text()
             message_data = json.loads(data)
-            
+
             # Process message
             chat_request = ChatMessage(**message_data)
             response = await chat_with_agent(chat_request)
-            
+
             # Send response back
             await websocket.send_text(json.dumps({
                 "type": "agent_response",
                 "data": response.dict()
             }))
-            
+
     except WebSocketDisconnect:
         active_connections.remove(websocket)
     except Exception as e:
@@ -258,7 +257,7 @@ async def get_real_performance_metrics():
     """Real performance metrics from actual AI usage"""
     if AGENTCRAFT_AVAILABLE and AI_POWERED:
         real_metrics = performance_tracker.get_metrics()
-        
+
         return {
             "agent_performance": real_metrics,
             "agentforce_comparison": {
@@ -372,7 +371,7 @@ async def analyze_competitor_with_real_ai(request: CompetitiveAnalysisRequest):
             # Use real AI competitive analysis
             query = f"Analyze {request.competitor} focusing on {', '.join(request.focus_areas)}"
             result = real_technical_agent.competitive_tool._run(query)
-            
+
             try:
                 analysis_data = json.loads(result)
                 return {
@@ -409,7 +408,7 @@ async def analyze_competitor_with_real_ai(request: CompetitiveAnalysisRequest):
                 competitor=request.competitor,
                 context=""
             )
-            
+
             return {
                 "our_capability": analysis,
                 "agentforce_simulation": {
@@ -432,7 +431,7 @@ async def analyze_competitor_with_real_ai(request: CompetitiveAnalysisRequest):
                 },
                 "ai_powered": False
             }
-            
+
     except Exception as e:
         return {
             "error": f"AI competitive analysis failed: {str(e)}",
@@ -450,10 +449,10 @@ async def receive_webhook(request: Request):
         # Get the raw body for signature verification
         body = await request.body()
         body_str = body.decode('utf-8')
-        
+
         # Get headers manually to avoid FastAPI header parsing issues
         headers = dict(request.headers)
-        
+
         # Support multiple signature header formats for API version compatibility
         x_webhook_signature = (
             headers.get("x-webhook-signature") or 
@@ -462,34 +461,34 @@ async def receive_webhook(request: Request):
             headers.get("X-Signature-256") or
             headers.get("signature")
         )
-        
+
         logging.info(f"Webhook received - Body length: {len(body_str)}, Headers: {list(headers.keys())}")
-        
+
         # Parse JSON payload
         try:
             payload = json.loads(body_str)
         except json.JSONDecodeError as e:
             logging.warning(f"Invalid JSON payload: {str(e)}")
             raise HTTPException(status_code=400, detail="Invalid JSON payload")
-        
+
         # Check for required fields
         required_fields = ["event_id", "event_type", "timestamp", "data"]
         missing_fields = [field for field in required_fields if field not in payload]
         if missing_fields:
             logging.warning(f"Missing required fields: {missing_fields}")
             raise HTTPException(status_code=400, detail=f"Missing required fields: {', '.join(missing_fields)}")
-        
+
         # Verify signature if provided - support multiple API versions
         if x_webhook_signature:
             secret_key = "test_secret_123"  # In production, get from secure config
-            
+
             # Generate expected signature
             expected_signature = hmac.new(
                 secret_key.encode('utf-8'),
                 body_str.encode('utf-8'),
                 hashlib.sha256
             ).hexdigest()
-            
+
             # Handle different signature formats for API version compatibility
             provided_signature = x_webhook_signature
             expected_formats = [
@@ -497,29 +496,29 @@ async def receive_webhook(request: Request):
                 f"sha256={expected_signature}",        # Prefixed format (v2.1.3)
                 f"SHA256={expected_signature}",        # Uppercase prefix
             ]
-            
+
             # Try multiple comparison formats to support version migration
             signature_valid = any(
                 hmac.compare_digest(expected_format, provided_signature) 
                 for expected_format in expected_formats
             )
-            
+
             # Also try extracting from prefixed format
             if not signature_valid and ("sha256=" in provided_signature.lower()):
                 extracted_sig = provided_signature.split("=", 1)[1] if "=" in provided_signature else provided_signature
                 signature_valid = hmac.compare_digest(expected_signature, extracted_sig)
-            
+
             if not signature_valid:
                 logging.warning(f"Invalid webhook signature. Expected formats: {expected_formats[:2]}, Got: {provided_signature[:16] if provided_signature else 'None'}...")
                 raise HTTPException(status_code=403, detail="Invalid signature - check API version compatibility")
-        
+
         # Process webhook based on event type
         event_type = payload.get("event_type")
         event_id = payload.get("event_id")
-        
+
         # Log webhook receipt
         logging.info(f"Received webhook: {event_type} (ID: {event_id})")
-        
+
         # Process different event types
         response_data = {
             "status": "success",
@@ -527,42 +526,42 @@ async def receive_webhook(request: Request):
             "processed_at": datetime.utcnow().isoformat(),
             "message": f"Successfully processed {event_type} webhook"
         }
-        
+
         # Handle specific event types with appropriate business logic
         if event_type == "user.created":
             # Process new user creation
             user_data = payload.get("data", {})
             response_data["action"] = "User account initialized"
             response_data["user_id"] = user_data.get("id")
-            
+
         elif event_type == "order.placed":
             # Process new order
             order_data = payload.get("data", {})
             response_data["action"] = "Order processing initiated"
             response_data["order_id"] = order_data.get("id")
-            
+
         elif event_type == "payment.failed":
             # Handle payment failure
             payment_data = payload.get("data", {})
             response_data["action"] = "Payment failure recorded"
             response_data["retry_scheduled"] = payment_data.get("next_retry_at")
-            
+
         elif event_type == "system.alert":
             # Process system alert
             alert_data = payload.get("data", {})
             severity = alert_data.get("severity", "unknown")
             response_data["action"] = f"Alert processed with {severity} severity"
             response_data["escalation_triggered"] = severity in ["high", "critical"]
-            
+
         elif event_type == "subscription.cancelled":
             # Handle subscription cancellation
             sub_data = payload.get("data", {})
             response_data["action"] = "Subscription cancellation processed"
             response_data["refund_amount"] = sub_data.get("proration_details", {}).get("refund_amount")
-        
+
         # Return success response
         return response_data
-        
+
     except HTTPException:
         # Re-raise HTTP exceptions (400, 401, etc.)
         raise
@@ -579,20 +578,20 @@ def extract_technical_terms(message: str) -> List[str]:
         "webhook", "api", "ssl", "authentication", "timeout", "json", "http", 
         "https", "certificate", "hmac", "signature", "payload", "endpoint"
     ]
-    
+
     found_terms = []
     message_lower = message.lower()
-    
+
     for term in technical_terms:
         if term in message_lower:
             found_terms.append(term)
-    
+
     return found_terms
 
 def get_mock_agent_response(agent_type: str, message: str) -> Dict[str, Any]:
     """Generate mock agent responses for demo"""
     import random
-    
+
     responses = {
         "technical": {
             "message": f"""🔧 **Technical Analysis Complete**
@@ -688,7 +687,7 @@ This analysis draws from my specialized competitive intelligence database and re
             "confidence": random.uniform(0.88, 0.96)
         }
     }
-    
+
     return responses.get(agent_type, responses["technical"])
 
 if __name__ == "__main__":

@@ -117,25 +117,51 @@ def start_frontend():
     
     # Set environment variables for React
     env = os.environ.copy()
-    env['REACT_APP_API_URL'] = 'http://localhost:8000'
+    env['REACT_APP_API_URL'] = 'http://0.0.0.0:8000'
     env['PORT'] = '3000'
     env['HOST'] = '0.0.0.0'
     env['DANGEROUSLY_DISABLE_HOST_CHECK'] = 'true'
+    env['WDS_SOCKET_HOST'] = '0.0.0.0'
+    env['WATCHPACK_POLLING'] = 'true'
+    env['CHOKIDAR_USEPOLLING'] = 'true'
     
     try:
         process = subprocess.Popen(
             ["npm", "start"],
             env=env,
             stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True
+            stderr=subprocess.PIPE,
+            text=True,
+            bufsize=1,
+            universal_newlines=True
         )
         
-        print("✅ React frontend starting...")
-        print("🌐 Frontend will be available at: http://localhost:3000")
-        print("🔧 Backend API available at: http://localhost:8000")
+        # Give it a moment to start
+        time.sleep(3)
         
-        return process
+        # Check if process is still running
+        if process.poll() is None:
+            print("✅ React frontend starting...")
+            print("🌐 Frontend will be available at: http://0.0.0.0:3000")
+            print("🔧 Backend API available at: http://0.0.0.0:8000")
+            
+            # Start a thread to monitor frontend output
+            def monitor_frontend():
+                for line in process.stdout:
+                    print(f"Frontend: {line.strip()}")
+                    if "webpack compiled" in line.lower() or "compiled successfully" in line.lower():
+                        print("✅ React frontend compiled successfully!")
+            
+            frontend_monitor = threading.Thread(target=monitor_frontend, daemon=True)
+            frontend_monitor.start()
+            
+            return process
+        else:
+            stdout, stderr = process.communicate()
+            print(f"❌ Frontend failed to start:")
+            print(f"STDOUT: {stdout}")
+            print(f"STDERR: {stderr}")
+            return None
         
     except Exception as e:
         print(f"❌ Error starting frontend: {e}")
