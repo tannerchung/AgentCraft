@@ -59,10 +59,52 @@ const AgentDemo = () => {
 
       const responseTime = Date.now() - startTime;
 
+      // Extract the response content properly
+      let responseContent;
+      if (response.data.response && typeof response.data.response === 'object') {
+        if (response.data.response.content) {
+          // Handle the new structured response format
+          responseContent = response.data.response.content;
+          
+          // If content contains AI analysis with JSON, format it properly
+          if (responseContent.includes('**AI Technical Analysis:**')) {
+            try {
+              const jsonStart = responseContent.indexOf('{');
+              const jsonEnd = responseContent.lastIndexOf('}') + 1;
+              if (jsonStart !== -1 && jsonEnd > jsonStart) {
+                const jsonStr = responseContent.substring(jsonStart, jsonEnd);
+                const parsed = JSON.parse(jsonStr);
+                
+                // Create a structured response for better display
+                responseContent = {
+                  issue_analysis: {
+                    diagnosis: parsed.diagnosis,
+                    root_cause: parsed.root_cause,
+                    solution: parsed.solution,
+                    fix_code: parsed.working_code,
+                    implementation_steps: parsed.implementation_steps,
+                    testing_approach: parsed.testing_approach,
+                    prevention: parsed.prevention,
+                    implementation_time: parsed.estimated_fix_time
+                  }
+                };
+              }
+            } catch (parseError) {
+              console.warn('Failed to parse AI response JSON:', parseError);
+              // Keep the original content if parsing fails
+            }
+          }
+        } else {
+          responseContent = response.data.response;
+        }
+      } else {
+        responseContent = response.data.response;
+      }
+
       const agentMessage = {
         id: Date.now() + 1,
         type: 'agent',
-        content: response.data.response,
+        content: responseContent,
         agentInfo: response.data.agent_info,
         competitiveAdvantage: response.data.competitive_advantage,
         responseTime: responseTime,

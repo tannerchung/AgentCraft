@@ -38,8 +38,8 @@ app = FastAPI(title="AgentCraft API", version="1.0.0")
 # CORS middleware for React frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://0.0.0.0:3000"],
-    allow_credentials=True,
+    allow_origins=["*"],  # Allow all origins for testing
+    allow_credentials=False,  # Disable credentials to allow wildcard
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -97,9 +97,86 @@ async def chat_with_real_ai_agent(request: ChatMessage):
             success = "error" not in result
             performance_tracker.track_response(processing_time, success)
             
+            # Parse and format the AI analysis if it's a JSON string
+            formatted_response = ""
+            
+            # Get the AI content from the technical response
+            ai_content = result["technical_response"].get('ai_analysis', '')
+            
+            if ai_content:
+                try:
+                    # Parse the JSON string from AI analysis
+                    parsed = json.loads(ai_content)
+                    
+                    # Create a nicely formatted markdown response
+                    formatted_response = f"""**Technical Diagnosis:**
+{parsed.get('diagnosis', 'Analysis provided')}
+
+**Root Cause:**
+{parsed.get('root_cause', 'Cause identified')}
+
+**Solution:**
+{parsed.get('solution', 'Solution provided')}
+
+**Working Code:**
+```python
+{parsed.get('working_code', 'Code example provided')}
+```
+
+**Implementation Steps:**
+{chr(10).join(f"{i+1}. {step}" for i, step in enumerate(parsed.get('implementation_steps', [])))}
+
+**Testing Approach:**
+{parsed.get('testing_approach', 'Testing guidance provided')}
+
+**Prevention:**
+{parsed.get('prevention', 'Prevention strategies provided')}
+
+**Estimated Time:** {parsed.get('estimated_fix_time', 'Time estimate provided')}"""
+                    
+                except json.JSONDecodeError as e:
+                    # If JSON parsing fails, return the raw content but still formatted
+                    print(f"JSON parsing error: {e}")
+                    formatted_response = f"**AI Technical Analysis:**\n\n{ai_content}\n\n**Response Type:** Real-time AI analysis using Claude 3 Sonnet"
+            
+            # Check for issue_analysis structure (already parsed JSON)
+            elif result["technical_response"].get('issue_analysis'):
+                issue_data = result["technical_response"]['issue_analysis']
+                formatted_response = f"""**Technical Diagnosis:**
+{issue_data.get('diagnosis', 'Analysis provided')}
+
+**Root Cause:**
+{issue_data.get('root_cause', 'Cause identified')}
+
+**Solution:**
+{issue_data.get('solution', 'Solution provided')}
+
+**Working Code:**
+```python
+{issue_data.get('working_code', 'Code example provided')}
+```
+
+**Implementation Steps:**
+{chr(10).join(f"{i+1}. {step}" for i, step in enumerate(issue_data.get('implementation_steps', [])))}
+
+**Testing Approach:**
+{issue_data.get('testing_approach', 'Testing guidance provided')}
+
+**Prevention:**
+{issue_data.get('prevention', 'Prevention strategies provided')}
+
+**Estimated Time:** {issue_data.get('estimated_fix_time', 'Time estimate provided')}"""
+            
+            else:
+                formatted_response = "AI analysis completed - no structured data available"
+            
             return {
                 "success": True,
-                "response": result["technical_response"],
+                "response": {
+                    "content": formatted_response,  # This is what React expects
+                    "raw_analysis": result["technical_response"],
+                    "solution_type": result["technical_response"].get('solution_type', 'AI Analysis')
+                },
                 "agent_info": result["agent_info"],
                 "competitive_advantage": result["competitive_advantage"],
                 "timestamp": result["timestamp"],
@@ -376,7 +453,15 @@ async def receive_webhook(request: Request):
         
         # Get headers manually to avoid FastAPI header parsing issues
         headers = dict(request.headers)
-        x_webhook_signature = headers.get("x-webhook-signature")
+        
+        # Support multiple signature header formats for API version compatibility
+        x_webhook_signature = (
+            headers.get("x-webhook-signature") or 
+            headers.get("X-Webhook-Signature") or
+            headers.get("x-signature-256") or
+            headers.get("X-Signature-256") or
+            headers.get("signature")
+        )
         
         logging.info(f"Webhook received - Body length: {len(body_str)}, Headers: {list(headers.keys())}")
         
@@ -394,24 +479,39 @@ async def receive_webhook(request: Request):
             logging.warning(f"Missing required fields: {missing_fields}")
             raise HTTPException(status_code=400, detail=f"Missing required fields: {', '.join(missing_fields)}")
         
-        # Verify signature if provided
+        # Verify signature if provided - support multiple API versions
         if x_webhook_signature:
             secret_key = "test_secret_123"  # In production, get from secure config
+            
+            # Generate expected signature
             expected_signature = hmac.new(
                 secret_key.encode('utf-8'),
                 body_str.encode('utf-8'),
                 hashlib.sha256
             ).hexdigest()
             
-            # Extract signature from header (format: "sha256=signature")
-            if x_webhook_signature.startswith("sha256="):
-                provided_signature = x_webhook_signature[7:]
-            else:
-                provided_signature = x_webhook_signature
+            # Handle different signature formats for API version compatibility
+            provided_signature = x_webhook_signature
+            expected_formats = [
+                expected_signature,                    # Raw hex (v2.0)
+                f"sha256={expected_signature}",        # Prefixed format (v2.1.3)
+                f"SHA256={expected_signature}",        # Uppercase prefix
+            ]
             
-            if not hmac.compare_digest(expected_signature, provided_signature):
-                logging.warning(f"Invalid webhook signature. Expected: {expected_signature[:8]}..., Got: {provided_signature[:8] if provided_signature else 'None'}...")
-                raise HTTPException(status_code=401, detail="Invalid signature")
+            # Try multiple comparison formats to support version migration
+            signature_valid = any(
+                hmac.compare_digest(expected_format, provided_signature) 
+                for expected_format in expected_formats
+            )
+            
+            # Also try extracting from prefixed format
+            if not signature_valid and ("sha256=" in provided_signature.lower()):
+                extracted_sig = provided_signature.split("=", 1)[1] if "=" in provided_signature else provided_signature
+                signature_valid = hmac.compare_digest(expected_signature, extracted_sig)
+            
+            if not signature_valid:
+                logging.warning(f"Invalid webhook signature. Expected formats: {expected_formats[:2]}, Got: {provided_signature[:16] if provided_signature else 'None'}...")
+                raise HTTPException(status_code=403, detail="Invalid signature - check API version compatibility")
         
         # Process webhook based on event type
         event_type = payload.get("event_type")

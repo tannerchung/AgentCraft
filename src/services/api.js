@@ -7,7 +7,7 @@ class ApiService {
   constructor() {
     this.client = axios.create({
       baseURL: API_BASE_URL,
-      timeout: 10000,
+      timeout: 30000, // Increased to 30 seconds for AI processing
       headers: {
         'Content-Type': 'application/json',
       }
@@ -17,20 +17,131 @@ class ApiService {
   async sendMessage(agentType, message) {
     try {
       const response = await this.client.post('/api/chat', {
-        agent_type: agentType,
+        agent_type: 'technical_support', // Map all to technical_support for now
         message: message,
         context: {
           timestamp: new Date().toISOString(),
-          session_id: this.getSessionId()
+          session_id: this.getSessionId(),
+          demo_mode: false
         }
       });
+      
+      // Process the real AI response
+      if (response.data.success && response.data.response) {
+        let processedMessage = '';
+        
+        // Check if we have formatted content from backend
+        if (response.data.response.content && response.data.response.content.startsWith('**')) {
+          processedMessage = response.data.response.content;
+        }
+        // Handle "**AI Technical Analysis:**" format from backend
+        else if (response.data.response.content && (
+          response.data.response.content.includes('AI Analysis (raw):') ||
+          response.data.response.content.includes('**AI Technical Analysis:**')
+        )) {
+          try {
+            // Extract JSON from either format
+            const jsonStart = response.data.response.content.indexOf('{');
+            const jsonEnd = response.data.response.content.lastIndexOf('}') + 1;
+            if (jsonStart !== -1 && jsonEnd > jsonStart) {
+              const jsonStr = response.data.response.content.substring(jsonStart, jsonEnd);
+              const parsed = JSON.parse(jsonStr);
+              
+              // Format the JSON into readable markdown
+              processedMessage = `**Technical Diagnosis:**
+${parsed.diagnosis || 'Analysis provided'}
+
+**Root Cause:**
+${parsed.root_cause || 'Cause identified'}
+
+**Solution:**
+${parsed.solution || 'Solution provided'}
+
+**Working Code:**
+\`\`\`${this.detectCodeLanguage(parsed.working_code)}
+${parsed.working_code || 'Code example provided'}
+\`\`\`
+
+**Implementation Steps:**
+${parsed.implementation_steps ? parsed.implementation_steps.map((step, i) => `${i + 1}. ${step}`).join('\n') : 'Steps provided'}
+
+**Testing Approach:**
+${parsed.testing_approach || 'Testing guidance provided'}
+
+**Prevention:**
+${parsed.prevention || 'Prevention strategies provided'}
+
+**Estimated Time:** ${parsed.estimated_fix_time || 'Time estimate provided'}`;
+            } else {
+              processedMessage = response.data.response.content;
+            }
+          } catch (parseError) {
+            console.warn('Failed to parse AI response JSON:', parseError);
+            processedMessage = response.data.response.content;
+          }
+        }
+        // Handle direct JSON response that needs formatting
+        else if (response.data.response.content) {
+          try {
+            const parsed = JSON.parse(response.data.response.content);
+            
+            // Format the JSON into readable markdown
+            processedMessage = `**Technical Diagnosis:**
+${parsed.diagnosis || 'Analysis provided'}
+
+**Root Cause:**
+${parsed.root_cause || 'Cause identified'}
+
+**Solution:**
+${parsed.solution || 'Solution provided'}
+
+**Working Code:**
+\`\`\`${this.detectCodeLanguage(parsed.working_code)}
+${parsed.working_code || 'Code example provided'}
+\`\`\`
+
+**Implementation Steps:**
+${parsed.implementation_steps ? parsed.implementation_steps.map((step, i) => `${i + 1}. ${step}`).join('\n') : 'Steps provided'}
+
+**Testing Approach:**
+${parsed.testing_approach || 'Testing guidance provided'}
+
+**Prevention:**
+${parsed.prevention || 'Prevention strategies provided'}
+
+**Estimated Time:** ${parsed.estimated_fix_time || 'Time estimate provided'}`;
+          } catch (parseError) {
+            // If JSON parsing fails, show the raw content
+            processedMessage = response.data.response.content;
+          }
+        }
+        // Fallback to ai_analysis if available
+        else if (response.data.response.ai_analysis) {
+          processedMessage = response.data.response.ai_analysis;
+        }
+        // Final fallback
+        else {
+          processedMessage = "AI response received but couldn't parse content";
+        }
+        
+        return {
+          message: processedMessage,
+          confidence: 0.95,
+          responseTime: response.data.agent_info?.response_time || 'N/A',
+          agentInfo: response.data.agent_info,
+          competitiveAdvantage: response.data.competitive_advantage
+        };
+      }
       
       return response.data;
     } catch (error) {
       console.error('API Error:', error);
       
-      // Return mock response for demo purposes
-      return this.getMockResponse(agentType, message);
+      // Return error message instead of mock data
+      return {
+        message: `I'm experiencing technical difficulties connecting to the AI system. Error: ${error.message}. Please ensure the backend server is running on localhost:8000.`,
+        confidence: 0.1
+      };
     }
   }
 
@@ -57,6 +168,15 @@ class ApiService {
   }
 
   // Helper methods
+  detectCodeLanguage(code) {
+    if (!code) return '';
+    const codeStr = code.toString().toLowerCase();
+    if (codeStr.includes('def ') || codeStr.includes('import ') || codeStr.includes('from ')) return 'python';
+    if (codeStr.includes('const ') || codeStr.includes('function ') || codeStr.includes('require(')) return 'javascript';
+    if (codeStr.includes('curl ') || codeStr.includes('#!/bin/')) return 'bash';
+    return 'javascript'; // default
+  }
+
   getSessionId() {
     let sessionId = localStorage.getItem('agentcraft_session');
     if (!sessionId) {

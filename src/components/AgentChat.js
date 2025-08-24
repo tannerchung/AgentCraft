@@ -1,6 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Bot, User, Clock, CheckCircle } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 import { useAgentChat } from '../hooks/useAgentChat';
 
 const AgentChat = () => {
@@ -176,7 +177,7 @@ const AgentChat = () => {
               className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
             >
               <div
-                className={`max-w-xs lg:max-w-md px-4 py-3 rounded-lg ${
+                className={`${msg.sender === 'agent' && msg.content.includes('**') ? 'max-w-4xl' : 'max-w-xs lg:max-w-md'} px-4 py-3 rounded-lg ${
                   msg.sender === 'user'
                     ? 'bg-salesforce-blue text-white'
                     : 'bg-gray-100 text-gray-900'
@@ -190,7 +191,30 @@ const AgentChat = () => {
                     <User className="w-5 h-5 mt-1" />
                   )}
                   <div className="flex-1">
-                    <p className="text-sm">{msg.content}</p>
+                    {msg.sender === 'agent' && msg.content.includes('**') ? (
+                      <div className="text-sm prose prose-sm max-w-none">
+                        <ReactMarkdown
+                          components={{
+                            h1: ({children}) => <h1 className="text-lg font-bold text-gray-900 mb-2">{children}</h1>,
+                            h2: ({children}) => <h2 className="text-base font-semibold text-gray-800 mb-2">{children}</h2>,
+                            h3: ({children}) => <h3 className="text-sm font-semibold text-gray-800 mb-1">{children}</h3>,
+                            strong: ({children}) => <strong className="font-semibold text-gray-900">{children}</strong>,
+                            p: ({children}) => <p className="mb-2 text-gray-700 leading-relaxed">{children}</p>,
+                            ul: ({children}) => <ul className="list-disc pl-4 mb-2 text-gray-700">{children}</ul>,
+                            ol: ({children}) => <ol className="list-decimal pl-4 mb-2 text-gray-700">{children}</ol>,
+                            li: ({children}) => <li className="mb-1">{children}</li>,
+                            code: ({inline, children}) => inline 
+                              ? <code className="bg-gray-100 px-1 py-0.5 rounded text-xs font-mono text-gray-800">{children}</code>
+                              : <code className="block bg-gray-100 p-3 rounded text-xs font-mono text-gray-800 whitespace-pre-wrap overflow-x-auto">{children}</code>,
+                            pre: ({children}) => <div className="bg-gray-100 p-3 rounded mb-2 overflow-x-auto">{children}</div>
+                          }}
+                        >
+                          {msg.content}
+                        </ReactMarkdown>
+                      </div>
+                    ) : (
+                      <p className="text-sm">{msg.content}</p>
+                    )}
                     <div className="flex items-center justify-between mt-2">
                       <span className="text-xs opacity-75">
                         {new Date(msg.timestamp).toLocaleTimeString()}
