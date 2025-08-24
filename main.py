@@ -117,7 +117,7 @@ def start_frontend():
     
     # Set environment variables for React
     env = os.environ.copy()
-    env['REACT_APP_API_URL'] = 'http://0.0.0.0:8000'
+    env['REACT_APP_API_URL'] = 'http://localhost:8000'
     env['PORT'] = '3000'
     env['HOST'] = '0.0.0.0'
     env['DANGEROUSLY_DISABLE_HOST_CHECK'] = 'true'
