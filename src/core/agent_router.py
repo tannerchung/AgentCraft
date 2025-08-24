@@ -1,101 +1,98 @@
 
 """
-Agent Router for AgentCraft - demonstrates architectural flexibility
-and rapid customization capabilities.
+Agent Router for AgentCraft - Intelligent routing to specialized agents vs generic topics
 """
 
 from typing import Dict, List, Optional, Any
 from src.core.base_agent import BaseAgent
-import re
+from src.agents.technical_support_agent import TechnicalSupportAgent
+import time
 import logging
 
 logger = logging.getLogger(__name__)
 
 
 class AgentRouter:
-    """
-    Intelligent routing system that matches queries to specialized agents
-    based on domain expertise rather than generic topic classification.
-    """
+    """Intelligent routing to specialized agents vs generic topics"""
     
     def __init__(self):
-        self.agents: Dict[str, BaseAgent] = {}
-        self.routing_patterns: Dict[str, List[str]] = {}
+        self.agents = {}
+        self.routing_rules = {}
+        self.performance_tracker = {
+            "total_requests": 0,
+            "successful_routes": 0,
+            "average_confidence": 0.0
+        }
         
-    def register_agent(self, agent: BaseAgent, routing_keywords: List[str]):
-        """
-        Register a specialized agent with routing keywords.
-        Enables rapid customization for new domains.
-        """
-        self.agents[agent.name] = agent
-        self.routing_patterns[agent.name] = routing_keywords
-        logger.info(f"Registered specialized agent: {agent.name} for domain: {agent.expertise_domain}")
+    def register_agent(self, agent_name: str, agent_instance: Any, keywords: List[str]):
+        """Register a specialized agent with routing keywords"""
+        self.agents[agent_name] = agent_instance
+        self.routing_rules[agent_name] = keywords
     
-    def route_query(self, query: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """
-        Route query to the most appropriate specialized agent.
-        Demonstrates domain knowledge advantage over generic responses.
-        """
-        # Calculate routing scores based on keyword matching and context
-        routing_scores = {}
+    def route_query(self, query: str, context: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Route query to most appropriate specialized agent"""
         
-        for agent_name, keywords in self.routing_patterns.items():
-            score = self._calculate_routing_score(query, keywords, context)
-            routing_scores[agent_name] = score
+        start_time = time.time()
+        self.performance_tracker["total_requests"] += 1
         
-        # Select agent with highest confidence score
-        if routing_scores:
-            best_agent_name = max(routing_scores, key=routing_scores.get)
-            confidence = routing_scores[best_agent_name]
-            
-            if confidence > 0.3:  # Minimum confidence threshold
-                selected_agent = self.agents[best_agent_name]
-                logger.info(f"Routing to specialized agent: {best_agent_name} (confidence: {confidence:.2f})")
-                
-                response = selected_agent.handle_query(query, context)
-                response["routing_info"] = {
-                    "selected_agent": best_agent_name,
-                    "routing_confidence": confidence,
-                    "available_agents": list(self.agents.keys())
-                }
-                return response
+        # Analyze query for agent selection
+        query_lower = query.lower()
+        agent_scores = {}
         
-        # Fallback response if no specialized agent matches
-        return {
-            "response": "I don't have a specialized agent for this query. Consider adding domain expertise for better results.",
-            "confidence": 0.1,
-            "agent_used": "fallback",
-            "routing_info": {
-                "selected_agent": "none",
-                "routing_confidence": 0.0,
+        # Score each agent based on keyword matching
+        for agent_name, keywords in self.routing_rules.items():
+            score = sum(1 for keyword in keywords if keyword in query_lower)
+            if score > 0:
+                agent_scores[agent_name] = score
+        
+        # Select highest scoring agent
+        if agent_scores:
+            best_agent = max(agent_scores.items(), key=lambda x: x[1])
+            selected_agent = best_agent[0]
+            confidence = min(best_agent[1] / 3.0, 1.0)  # Normalize confidence
+        else:
+            # Default to technical support for technical queries
+            selected_agent = "technical_support"
+            confidence = 0.5
+        
+        # Route to selected agent
+        if selected_agent in self.agents:
+            response = self.agents[selected_agent].process_technical_query(query, context)
+            self.performance_tracker["successful_routes"] += 1
+        else:
+            response = {
+                "error": f"Agent {selected_agent} not available",
                 "available_agents": list(self.agents.keys())
             }
-        }
-    
-    def _calculate_routing_score(self, query: str, keywords: List[str], context: Optional[Dict[str, Any]]) -> float:
-        """Calculate routing confidence score based on keyword matching."""
-        query_lower = query.lower()
-        matches = 0
+            confidence = 0.0
         
-        for keyword in keywords:
-            if keyword.lower() in query_lower:
-                matches += 1
+        routing_time = time.time() - start_time
         
-        # Base score from keyword matching
-        score = matches / len(keywords) if keywords else 0
-        
-        # Boost score if context provides additional signals
-        if context and "technical_indicators" in context:
-            technical_matches = sum(1 for indicator in context["technical_indicators"] 
-                                  if any(keyword.lower() in indicator.lower() for keyword in keywords))
-            score += technical_matches * 0.2
-        
-        return min(score, 1.0)  # Cap at 1.0
-    
-    def get_agent_status(self) -> Dict[str, Any]:
-        """Get status and performance metrics for all registered agents."""
         return {
-            "total_agents": len(self.agents),
-            "agents": {name: agent.get_capabilities() for name, agent in self.agents.items()},
-            "routing_patterns": self.routing_patterns
+            "routing_info": {
+                "selected_agent": selected_agent,
+                "confidence": confidence,
+                "routing_time": routing_time,
+                "available_agents": list(self.agents.keys())
+            },
+            "agent_response": response,
+            "performance_metrics": self.performance_tracker
         }
+    
+# Initialize router with technical support agent
+def initialize_agent_system():
+    """Set up the specialized agent system"""
+    router = AgentRouter()
+    
+    # Register Technical Support Agent
+    tech_agent = TechnicalSupportAgent()
+    router.register_agent(
+        agent_name="technical_support",
+        agent_instance=tech_agent,
+        keywords=["webhook", "api", "integration", "signature", "timeout", "403", "429", "technical", "agentforce", "competitor"]
+    )
+    
+    return router
+
+# Global instance for use in FastAPI
+agent_router = initialize_agent_system()
