@@ -1,0 +1,79 @@
+# AgentCraft - Initial Setup Prompt
+
+## For Replit/Cursor/Claude:
+
+```
+I'm building "AgentCraft" - a demonstration of specialized AI agent architecture that showcases the value of domain expertise over generic topic handling. This is for a technical presentation to Salesforce architects showing how specialized agents can complement their AgentForce platform.
+
+Please help me create the initial project structure with:
+
+1. **Core Framework**: CrewAI-based multi-agent system
+2. **First Specialized Agent**: Technical Support Specialist with webhook expertise
+3. **Demo Focus**: Show specific technical knowledge vs generic responses
+4. **Professional Tone**: Respectful comparison, not aggressive competition
+
+**Project Structure Needed:**
+```
+agentcraft/
+├── src/
+│   ├── agents/
+│   │   └── technical_support_agent.py
+│   ├── core/
+│   │   ├── base_agent.py
+│   │   └── agent_router.py
+│   ├── tools/
+│   │   └── webhook_analysis_tool.py
+│   └── demo/
+│       └── streamlit_dashboard.py
+├── requirements.txt
+├── README.md
+└── .env.example
+```
+
+**Key Features to Implement:**
+1. Technical Support Agent with webhook troubleshooting expertise
+2. Webhook Analysis Tool that provides specific code-level solutions
+3. Simple routing system for agent selection
+4. Basic Streamlit demo showing agent capabilities
+5. Performance tracking to measure response quality
+
+**Technical Requirements:**
+- Python 3.11+
+- CrewAI for agent orchestration
+- OpenAI/Anthropic API integration
+- Streamlit for demo interface
+- Professional error handling
+- Clean, documented code
+
+**Competitive Positioning:**
+- Focus on "specialized expertise" vs "generic topic handling"
+- Emphasize "architectural flexibility" vs "platform constraints"
+- Show "domain knowledge depth" vs "template responses"
+- Demonstrate "rapid customization" vs "vendor roadmap dependency"
+
+Please start with the basic project structure, requirements.txt, and the first Technical Support Agent that can handle webhook integration issues with specific technical expertise.
+
+The goal is to show how specialized agents can provide more accurate, helpful responses than generic topic-based systems, while respecting that both approaches have value in different contexts.
+```
+
+## Additional Context for Your Development:
+
+**Key Messages to Embed:**
+- "Specialized expertise delivers superior customer outcomes"
+- "Architectural flexibility enables rapid innovation"  
+- "Domain knowledge creates competitive advantage"
+- "Custom solutions complement platform approaches"
+
+**Avoid These Phrases:**
+- "AgentForce killer" or similar aggressive language
+- "Replace Salesforce" messaging
+- Any direct criticism of their technical choices
+- Dismissive language about platform approaches
+
+**Professional Positioning:**
+- "Alternative architectural approach"
+- "Specialized expertise focus"
+- "Custom solution capabilities"
+- "Complementary technology demonstration"
+
+This approach will resonate well with Salesforce architects who appreciate technical sophistication while respecting their current platform investments.
