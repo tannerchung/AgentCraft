@@ -1,5 +1,5 @@
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Dict, Any, Optional, List
@@ -9,6 +9,8 @@ import asyncio
 import logging
 import sys
 import os
+import hmac
+import hashlib
 from datetime import datetime
 
 # Add src to path for AgentCraft imports
@@ -230,6 +232,115 @@ async def analyze_competitor(request: CompetitiveAnalysisRequest):
             "note": "This demonstrates the complexity of building unrestricted competitive intelligence"
         }
 
+@app.post("/webhooks/receive")
+async def receive_webhook(request: Request):
+    """
+    Webhook receiver endpoint for testing webhook scenarios
+    Validates signatures, processes payloads, and returns appropriate responses
+    """
+    try:
+        # Get the raw body for signature verification
+        body = await request.body()
+        body_str = body.decode('utf-8')
+        
+        # Get headers manually to avoid FastAPI header parsing issues
+        headers = dict(request.headers)
+        x_webhook_signature = headers.get("x-webhook-signature")
+        
+        logging.info(f"Webhook received - Body length: {len(body_str)}, Headers: {list(headers.keys())}")
+        
+        # Parse JSON payload
+        try:
+            payload = json.loads(body_str)
+        except json.JSONDecodeError as e:
+            logging.warning(f"Invalid JSON payload: {str(e)}")
+            raise HTTPException(status_code=400, detail="Invalid JSON payload")
+        
+        # Check for required fields
+        required_fields = ["event_id", "event_type", "timestamp", "data"]
+        missing_fields = [field for field in required_fields if field not in payload]
+        if missing_fields:
+            logging.warning(f"Missing required fields: {missing_fields}")
+            raise HTTPException(status_code=400, detail=f"Missing required fields: {', '.join(missing_fields)}")
+        
+        # Verify signature if provided
+        if x_webhook_signature:
+            secret_key = "test_secret_123"  # In production, get from secure config
+            expected_signature = hmac.new(
+                secret_key.encode('utf-8'),
+                body_str.encode('utf-8'),
+                hashlib.sha256
+            ).hexdigest()
+            
+            # Extract signature from header (format: "sha256=signature")
+            if x_webhook_signature.startswith("sha256="):
+                provided_signature = x_webhook_signature[7:]
+            else:
+                provided_signature = x_webhook_signature
+            
+            if not hmac.compare_digest(expected_signature, provided_signature):
+                logging.warning(f"Invalid webhook signature. Expected: {expected_signature[:8]}..., Got: {provided_signature[:8] if provided_signature else 'None'}...")
+                raise HTTPException(status_code=401, detail="Invalid signature")
+        
+        # Process webhook based on event type
+        event_type = payload.get("event_type")
+        event_id = payload.get("event_id")
+        
+        # Log webhook receipt
+        logging.info(f"Received webhook: {event_type} (ID: {event_id})")
+        
+        # Process different event types
+        response_data = {
+            "status": "success",
+            "event_id": event_id,
+            "processed_at": datetime.utcnow().isoformat(),
+            "message": f"Successfully processed {event_type} webhook"
+        }
+        
+        # Handle specific event types with appropriate business logic
+        if event_type == "user.created":
+            # Process new user creation
+            user_data = payload.get("data", {})
+            response_data["action"] = "User account initialized"
+            response_data["user_id"] = user_data.get("id")
+            
+        elif event_type == "order.placed":
+            # Process new order
+            order_data = payload.get("data", {})
+            response_data["action"] = "Order processing initiated"
+            response_data["order_id"] = order_data.get("id")
+            
+        elif event_type == "payment.failed":
+            # Handle payment failure
+            payment_data = payload.get("data", {})
+            response_data["action"] = "Payment failure recorded"
+            response_data["retry_scheduled"] = payment_data.get("next_retry_at")
+            
+        elif event_type == "system.alert":
+            # Process system alert
+            alert_data = payload.get("data", {})
+            severity = alert_data.get("severity", "unknown")
+            response_data["action"] = f"Alert processed with {severity} severity"
+            response_data["escalation_triggered"] = severity in ["high", "critical"]
+            
+        elif event_type == "subscription.cancelled":
+            # Handle subscription cancellation
+            sub_data = payload.get("data", {})
+            response_data["action"] = "Subscription cancellation processed"
+            response_data["refund_amount"] = sub_data.get("proration_details", {}).get("refund_amount")
+        
+        # Return success response
+        return response_data
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions (400, 401, etc.)
+        raise
+    except Exception as e:
+        logging.error(f"Webhook processing error: {str(e)}")
+        import traceback
+        logging.error(f"Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
 # Utility functions
 def extract_technical_terms(message: str) -> List[str]:
     """Extract technical terms from message"""
@@ -351,4 +462,5 @@ This analysis draws from my specialized competitive intelligence database and re
 
 if __name__ == "__main__":
     import uvicorn
+    logging.basicConfig(level=logging.INFO)
     uvicorn.run(app, host="0.0.0.0", port=8000)
