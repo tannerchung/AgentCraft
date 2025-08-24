@@ -256,31 +256,52 @@ class RealTechnicalSupportAgent:
                     }
             
             else:
-                # General technical AI analysis
-                general_prompt = f"""
-                As a senior technical specialist, analyze this query and provide expert guidance:
-                {query}
+                # Check if this is a non-technical query
+                non_technical_keywords = ['weather', 'hello', 'hi', 'how are you', 'goodbye', 'thanks', 'thank you', 'joke', 'story', 'food', 'movie', 'music', 'sports', 'politics', 'news', 'chat', 'talk']
                 
-                Provide practical, actionable advice with specific technical recommendations.
-                """
-                
-                try:
-                    message = client.messages.create(
-                        model="claude-3-5-sonnet-20241022",
-                        max_tokens=1500,
-                        temperature=0.2,
-                        messages=[{"role": "user", "content": general_prompt}]
-                    )
+                if any(keyword in query_lower for keyword in non_technical_keywords):
+                    # Handle non-technical queries gracefully
+                    result = {
+                        "ai_analysis": f"""I'm a specialized technical integration agent focused on webhook troubleshooting, API issues, and competitive analysis. 
+
+While I'd be happy to chat, I'm specifically designed to help with technical challenges like:
+- Webhook signature failures and 403/404 errors
+- API integration timeouts and performance issues  
+- Competitive analysis vs platforms like AgentForce
+- SSL certificate and security problems
+- Rate limiting and scalability optimization
+
+Is there a technical issue I can help you solve today? Try asking about webhook problems, API integrations, or how we compare to other agent platforms.""",
+                        "solution_type": "Specialized Agent Response",
+                        "redirect_suggestion": "Try asking about technical issues like webhook failures, API problems, or competitive analysis."
+                    }
+                else:
+                    # General technical AI analysis for potentially technical queries
+                    general_prompt = f"""
+                    As a senior technical specialist, analyze this query and provide expert guidance:
+                    {query}
                     
-                    result = {
-                        "ai_analysis": message.content[0].text,
-                        "solution_type": "General Technical AI Analysis"
-                    }
-                except Exception as e:
-                    result = {
-                        "analysis": f"AI analysis temporarily unavailable: {str(e)}",
-                        "recommendation": "Please check your API configuration and try again."
-                    }
+                    If this appears to be a technical question, provide practical, actionable advice with specific technical recommendations.
+                    If this is not a technical question, politely redirect to technical topics you specialize in.
+                    """
+                    
+                    try:
+                        message = client.messages.create(
+                            model="claude-3-5-sonnet-20241022",
+                            max_tokens=1500,
+                            temperature=0.2,
+                            messages=[{"role": "user", "content": general_prompt}]
+                        )
+                        
+                        result = {
+                            "ai_analysis": message.content[0].text,
+                            "solution_type": "General Technical AI Analysis"
+                        }
+                    except Exception as e:
+                        result = {
+                            "analysis": f"AI analysis temporarily unavailable: {str(e)}",
+                            "recommendation": "Please check your API configuration and try again."
+                        }
             
             processing_time = time.time() - start_time
             

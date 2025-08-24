@@ -1,35 +1,39 @@
 
 import React, { useState } from 'react';
 import Dashboard from './components/Dashboard';
+import EnhancedDashboard from './components/EnhancedDashboard';
+import ABTestingDashboard from './components/ABTestingDashboard';
 import AgentChat from './components/AgentChat';
-import CompetitiveAnalysis from './components/CompetitiveAnalysis';
 import MultiAgentDemo from './components/MultiAgentDemo';
-import AgentDemo from './components/AgentDemo';
-import { Activity, MessageSquare, TrendingUp, Users, Bot } from 'lucide-react';
+import AgentConfiguration from './components/AgentConfiguration';
+import { Activity, MessageSquare, Users, BarChart3, Zap, Settings } from 'lucide-react';
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
 
   const tabs = [
     { id: 'dashboard', name: 'Dashboard', icon: Activity },
-    { id: 'agent-demo', name: 'Live Agent Demo', icon: Bot },
+    { id: 'enhanced-dashboard', name: 'Performance Analytics', icon: BarChart3 },
+    { id: 'ab-testing', name: 'A/B Testing', icon: Zap },
     { id: 'chat', name: 'Agent Chat', icon: MessageSquare },
-    { id: 'competitive', name: 'Competitive Analysis', icon: TrendingUp },
     { id: 'multi-agent', name: 'Multi-Agent Demo', icon: Users },
+    { id: 'agent-config', name: 'Agent Configuration', icon: Settings },
   ];
 
   const renderActiveComponent = () => {
     switch (activeTab) {
       case 'dashboard':
         return <Dashboard />;
-      case 'agent-demo':
-        return <AgentDemo />;
+      case 'enhanced-dashboard':
+        return <EnhancedDashboard />;
+      case 'ab-testing':
+        return <ABTestingDashboard />;
       case 'chat':
         return <AgentChat />;
-      case 'competitive':
-        return <CompetitiveAnalysis />;
       case 'multi-agent':
         return <MultiAgentDemo />;
+      case 'agent-config':
+        return <AgentConfiguration />;
       default:
         return <Dashboard />;
     }

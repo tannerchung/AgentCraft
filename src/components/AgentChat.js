@@ -1,60 +1,336 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, CheckCircle } from 'lucide-react';
+import { Send, Bot, User, CheckCircle, Search, Filter, ChevronDown } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { useAgentChat } from '../hooks/useAgentChat';
 
 const AgentChat = () => {
   const [selectedAgent, setSelectedAgent] = useState('technical');
   const [message, setMessage] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
   const messagesEndRef = useRef(null);
   
   const { messages, sendMessage, isLoading, agentStatus } = useAgentChat(selectedAgent);
 
   const agents = [
+    // Technical Domain
     {
       id: 'technical',
-      name: 'Technical Support',
-      description: 'Webhook troubleshooting, API integration, SSL issues',
+      name: 'Technical Integration Specialist',
+      description: 'APIs, webhooks, SSL, authentication, and system integrations',
       avatar: '🔧',
-      expertise: ['Webhooks', 'APIs', 'SSL', 'Authentication']
+      category: 'Technical',
+      expertise: ['Webhook debugging', 'API authentication', 'SSL certificates', 'System architecture']
     },
+    {
+      id: 'devops',
+      name: 'DevOps Engineer',
+      description: 'Deployment, infrastructure, monitoring, and performance optimization',
+      avatar: '⚙️',
+      category: 'Technical',
+      expertise: ['CI/CD', 'Docker', 'Kubernetes', 'Monitoring', 'Performance tuning']
+    },
+    {
+      id: 'security',
+      name: 'Security Specialist',
+      description: 'Security audits, compliance, vulnerability assessment, and encryption',
+      avatar: '🛡️',
+      category: 'Technical',
+      expertise: ['Penetration testing', 'GDPR compliance', 'OAuth', 'Encryption']
+    },
+    {
+      id: 'database',
+      name: 'Database Expert',
+      description: 'Database design, optimization, migrations, and data modeling',
+      avatar: '🗄️',
+      category: 'Technical',
+      expertise: ['SQL optimization', 'Database migrations', 'Data modeling']
+    },
+    
+    // Business Domain  
     {
       id: 'billing',
-      name: 'Billing Specialist',
-      description: 'Payment processing, subscription management, invoicing',
+      name: 'Billing & Revenue Expert',
+      description: 'Payment processing, subscription management, revenue recognition',
       avatar: '💳',
-      expertise: ['Payments', 'Subscriptions', 'Invoicing', 'Refunds']
+      category: 'Business',
+      expertise: ['Payment gateways', 'Subscription models', 'Revenue analytics', 'Tax compliance']
     },
     {
+      id: 'legal',
+      name: 'Legal Compliance Agent',
+      description: 'Contract analysis, compliance requirements, and legal documentation',
+      avatar: '⚖️',
+      category: 'Business',
+      expertise: ['Contract review', 'GDPR', 'Data privacy', 'Terms of service']
+    },
+    {
+      id: 'sales',
+      name: 'Sales Operations Specialist',
+      description: 'CRM management, lead qualification, and sales process optimization',
+      avatar: '📈',
+      category: 'Business',
+      expertise: ['Salesforce admin', 'Lead scoring', 'Sales analytics', 'Pipeline management']
+    },
+    {
+      id: 'marketing',
+      name: 'Marketing Automation Expert',
+      description: 'Campaign management, lead nurturing, and marketing technology',
+      avatar: '📢',
+      category: 'Business',
+      expertise: ['Email campaigns', 'Lead nurturing', 'Marketing analytics', 'A/B testing']
+    },
+    
+    // Analysis Domain
+    {
       id: 'competitive',
-      name: 'Competitive Analysis',
-      description: 'Market intelligence, competitor analysis, positioning',
+      name: 'Competitive Intelligence Analyst',
+      description: 'Market research, competitor analysis, and strategic positioning',
       avatar: '📊',
-      expertise: ['Market Research', 'Competitive Intel', 'Positioning']
+      category: 'Analysis',
+      expertise: ['Market research', 'Competitor analysis', 'Pricing strategy', 'SWOT analysis']
+    },
+    {
+      id: 'data',
+      name: 'Data Analytics Specialist',
+      description: 'Business intelligence, reporting, and predictive analytics',
+      avatar: '📈',
+      category: 'Analysis',
+      expertise: ['SQL queries', 'Dashboard creation', 'Predictive modeling', 'KPI tracking']
+    },
+    {
+      id: 'finance',
+      name: 'Financial Analyst',
+      description: 'Financial modeling, budgeting, forecasting, and cost analysis',
+      avatar: '💰',
+      category: 'Analysis',
+      expertise: ['ROI analysis', 'Budget planning', 'Cost modeling', 'Financial forecasting']
+    },
+    
+    // Customer Domain
+    {
+      id: 'support',
+      name: 'Customer Success Manager',
+      description: 'Customer onboarding, retention strategies, and relationship management',
+      avatar: '🎯',
+      category: 'Customer',
+      expertise: ['Customer onboarding', 'Retention analysis', 'Health scoring', 'Expansion planning']
+    },
+    {
+      id: 'training',
+      name: 'Training & Education Specialist',
+      description: 'User education, documentation, and knowledge management',
+      avatar: '🎓',
+      category: 'Customer',
+      expertise: ['Course creation', 'Documentation', 'User guides', 'Video tutorials']
+    },
+    
+    // Product Domain
+    {
+      id: 'product',
+      name: 'Product Manager',
+      description: 'Product strategy, roadmap planning, and feature prioritization',
+      avatar: '🚀',
+      category: 'Product',
+      expertise: ['Product roadmap', 'User research', 'Feature prioritization', 'Market analysis']
+    },
+    {
+      id: 'ux',
+      name: 'UX Research Specialist',
+      description: 'User experience research, design analysis, and usability testing',
+      avatar: '🎨',
+      category: 'Product',
+      expertise: ['User interviews', 'Usability testing', 'Design systems', 'User journey mapping']
+    },
+    
+    // Industry Specialists
+    {
+      id: 'healthcare',
+      name: 'Healthcare Compliance Expert',
+      description: 'HIPAA compliance, healthcare regulations, and medical data handling',
+      avatar: '🏥',
+      category: 'Industry',
+      expertise: ['HIPAA compliance', 'Medical data', 'Healthcare regulations', 'Patient privacy']
+    },
+    {
+      id: 'fintech',
+      name: 'Financial Services Specialist',
+      description: 'Banking regulations, PCI compliance, and financial data security',
+      avatar: '🏦',
+      category: 'Industry',
+      expertise: ['PCI compliance', 'Banking regulations', 'Financial APIs', 'Fraud detection']
+    },
+    {
+      id: 'ecommerce',
+      name: 'E-commerce Platform Expert',
+      description: 'Online retail, inventory management, and payment processing',
+      avatar: '🛒',
+      category: 'Industry',
+      expertise: ['Shopping cart', 'Inventory systems', 'Payment gateways', 'Order management']
+    },
+    {
+      id: 'saas',
+      name: 'SaaS Business Model Expert',
+      description: 'Subscription models, SaaS metrics, and platform scaling',
+      avatar: '☁️',
+      category: 'Industry',
+      expertise: ['Subscription billing', 'SaaS metrics', 'Multi-tenancy', 'Platform scaling']
     }
   ];
 
   const demoQueries = {
+    // Technical Domain
     technical: [
       "My webhook is failing with SSL certificate verification errors",
-      "I'm getting 401 errors when sending webhooks with HMAC signatures",
       "How do I implement webhook retry logic with exponential backoff?",
-      "My API integration is timing out. How should I configure this?"
+      "API integration is timing out. How should I configure this?",
+      "Getting 401 errors when sending webhooks with HMAC signatures"
     ],
+    devops: [
+      "How do I set up a CI/CD pipeline for microservices?",
+      "Container orchestration best practices for scaling",
+      "Setting up monitoring alerts for production systems",
+      "Blue-green deployment strategy for zero downtime"
+    ],
+    security: [
+      "Conduct a security audit of our API endpoints",
+      "Implement OAuth 2.0 with PKCE for mobile apps",
+      "GDPR compliance checklist for data processing",
+      "Vulnerability assessment for web application"
+    ],
+    database: [
+      "Optimize slow-running SQL queries in production",
+      "Database migration strategy for zero downtime",
+      "Design data model for multi-tenant architecture",
+      "Index optimization for improved query performance"
+    ],
+    
+    // Business Domain
     billing: [
-      "How do I handle failed payment webhooks?",
-      "Customer wants to upgrade their subscription mid-cycle",
-      "How do I process a partial refund for an annual subscription?",
-      "What's the best way to handle dunning management?"
+      "Handle failed payment webhooks and retry logic",
+      "Customer wants to upgrade subscription mid-cycle",
+      "Process partial refund for annual subscription",
+      "Implement dunning management for failed payments"
     ],
+    legal: [
+      "Review contract terms for API usage limits",
+      "GDPR compliance requirements for user data",
+      "Privacy policy updates for new data collection",
+      "Terms of service for SaaS platform"
+    ],
+    sales: [
+      "Set up lead scoring in Salesforce CRM",
+      "Optimize sales pipeline conversion rates",
+      "Create automated sales analytics dashboard",
+      "Configure territory management rules"
+    ],
+    marketing: [
+      "Set up email automation for lead nurturing",
+      "A/B test campaign performance optimization",
+      "Marketing attribution tracking setup",
+      "Lead qualification scoring system"
+    ],
+    
+    // Analysis Domain
     competitive: [
-      "How does our pricing compare to Salesforce Service Cloud?",
-      "What are the key differentiators against Zendesk?",
-      "Show me competitive intelligence on Microsoft Dynamics",
-      "What's our positioning against custom-built solutions?"
+      "Compare our pricing to Salesforce Service Cloud",
+      "Key differentiators against Zendesk platform",
+      "Competitive intelligence on Microsoft Dynamics",
+      "Market positioning against custom solutions"
+    ],
+    data: [
+      "Create executive dashboard for key metrics",
+      "Predictive model for customer churn analysis",
+      "SQL query optimization for reporting",
+      "KPI tracking and business intelligence setup"
+    ],
+    finance: [
+      "ROI analysis for new feature development",
+      "Budget planning for next fiscal year",
+      "Cost modeling for infrastructure scaling",
+      "Financial forecasting for growth projections"
+    ],
+    
+    // Customer Domain
+    support: [
+      "Customer onboarding optimization strategy",
+      "Reduce churn risk through health scoring",
+      "Expansion revenue opportunity analysis",
+      "Customer success metrics and tracking"
+    ],
+    training: [
+      "Create interactive tutorial for new users",
+      "Documentation strategy for API changes",
+      "Video training series for product features",
+      "Knowledge base optimization for support"
+    ],
+    
+    // Product Domain
+    product: [
+      "Product roadmap prioritization framework",
+      "User research insights for feature development",
+      "Market analysis for new product launch",
+      "Feature adoption tracking and optimization"
+    ],
+    ux: [
+      "Usability testing for checkout flow",
+      "User journey mapping for onboarding",
+      "Design system consistency audit",
+      "User interview insights for product direction"
+    ],
+    
+    // Industry Specialists
+    healthcare: [
+      "HIPAA compliance audit for patient data",
+      "Medical data handling best practices",
+      "Healthcare regulation requirements review",
+      "Patient privacy protection implementation"
+    ],
+    fintech: [
+      "PCI DSS compliance assessment",
+      "Banking regulation compliance review",
+      "Financial API security implementation",
+      "Fraud detection system optimization"
+    ],
+    ecommerce: [
+      "Shopping cart abandonment analysis",
+      "Payment gateway optimization strategy",
+      "Inventory management system setup",
+      "Order fulfillment process optimization"
+    ],
+    saas: [
+      "SaaS metrics dashboard creation",
+      "Multi-tenant architecture scaling",
+      "Subscription billing optimization",
+      "Customer acquisition cost analysis"
     ]
   };
+
+  // Get unique categories
+  const categories = ['All', ...new Set(agents.map(agent => agent.category))];
+  
+  // Filter agents based on search and category
+  const filteredAgents = agents.filter(agent => {
+    const matchesSearch = searchTerm === '' || 
+      agent.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      agent.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      agent.expertise.some(skill => skill.toLowerCase().includes(searchTerm.toLowerCase()));
+    
+    const matchesCategory = selectedCategory === 'All' || agent.category === selectedCategory;
+    
+    return matchesSearch && matchesCategory;
+  });
+
+  // Group agents by category for display
+  const agentsByCategory = filteredAgents.reduce((acc, agent) => {
+    if (!acc[agent.category]) {
+      acc[agent.category] = [];
+    }
+    acc[agent.category].push(agent);
+    return acc;
+  }, {});
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -77,59 +353,150 @@ const AgentChat = () => {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 h-[calc(100vh-200px)]">
       {/* Agent Selection Sidebar */}
-      <div className="lg:col-span-1 space-y-6">
-        <div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Select Agent</h3>
-          <div className="space-y-3">
-            {agents.map((agent) => (
+      <div className="lg:col-span-1 space-y-4">
+        <div className="bg-white rounded-lg shadow-sm border p-4">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">Agent Library</h3>
+            <span className="text-sm text-gray-500">{agents.length} specialists</span>
+          </div>
+          
+          {/* Search and Filter */}
+          <div className="space-y-3 mb-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <input
+                type="text"
+                placeholder="Search agents..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+              />
+            </div>
+            
+            <div className="relative">
               <button
-                key={agent.id}
-                onClick={() => setSelectedAgent(agent.id)}
-                className={`w-full p-4 rounded-lg border-2 transition-all text-left ${
-                  selectedAgent === agent.id
-                    ? 'border-salesforce-blue bg-salesforce-lightblue'
-                    : 'border-gray-200 bg-white hover:border-gray-300'
-                }`}
+                onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
+                className="w-full flex items-center justify-between px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm"
               >
-                <div className="flex items-center mb-2">
-                  <span className="text-2xl mr-3">{agent.avatar}</span>
-                  <div>
-                    <h4 className="font-medium text-gray-900">{agent.name}</h4>
-                    <div className="flex items-center mt-1">
-                      <div className="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
-                      <span className="text-xs text-gray-500">Online</span>
-                    </div>
-                  </div>
+                <div className="flex items-center">
+                  <Filter className="w-4 h-4 mr-2 text-gray-400" />
+                  <span>{selectedCategory}</span>
                 </div>
-                <p className="text-sm text-gray-600 mb-2">{agent.description}</p>
-                <div className="flex flex-wrap gap-1">
-                  {agent.expertise.map((skill) => (
-                    <span
-                      key={skill}
-                      className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded"
+                <ChevronDown className="w-4 h-4 text-gray-400" />
+              </button>
+              
+              {showCategoryDropdown && (
+                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg">
+                  {categories.map((category) => (
+                    <button
+                      key={category}
+                      onClick={() => {
+                        setSelectedCategory(category);
+                        setShowCategoryDropdown(false);
+                      }}
+                      className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-50 first:rounded-t-lg last:rounded-b-lg ${
+                        selectedCategory === category ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                      }`}
                     >
-                      {skill}
-                    </span>
+                      {category}
+                    </button>
                   ))}
                 </div>
-              </button>
+              )}
+            </div>
+          </div>
+
+          {/* Agent List */}
+          <div className="space-y-3 max-h-96 overflow-y-auto">
+            {Object.keys(agentsByCategory).length === 0 && (
+              <div className="text-center py-8 text-gray-500">
+                <Bot className="w-8 h-8 mx-auto mb-2" />
+                <p className="text-sm">No agents found</p>
+              </div>
+            )}
+            
+            {Object.entries(agentsByCategory).map(([category, categoryAgents]) => (
+              <div key={category}>
+                {selectedCategory === 'All' && (
+                  <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                    {category} ({categoryAgents.length})
+                  </h4>
+                )}
+                
+                {categoryAgents.map((agent) => (
+                  <button
+                    key={agent.id}
+                    onClick={() => setSelectedAgent(agent.id)}
+                    className={`w-full p-3 rounded-lg border transition-all text-left mb-2 ${
+                      selectedAgent === agent.id
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    <div className="flex items-start">
+                      <span className="text-lg mr-2 mt-0.5">{agent.avatar}</span>
+                      <div className="flex-1 min-w-0">
+                        <h4 className={`font-medium text-sm ${
+                          selectedAgent === agent.id ? 'text-blue-900' : 'text-gray-900'
+                        }`}>
+                          {agent.name}
+                        </h4>
+                        <p className="text-xs text-gray-600 mt-1 line-clamp-2">
+                          {agent.description}
+                        </p>
+                        <div className="flex items-center mt-2">
+                          <div className={`w-1.5 h-1.5 rounded-full mr-1 ${
+                            selectedAgent === agent.id ? 'bg-blue-400' : 'bg-green-400'
+                          }`}></div>
+                          <span className="text-xs text-gray-500">
+                            {agent.expertise.slice(0,2).join(' • ')}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
             ))}
           </div>
         </div>
 
         {/* Demo Queries */}
-        <div>
-          <h4 className="text-md font-medium text-gray-900 mb-3">Try These Queries</h4>
+        <div className="bg-white rounded-lg shadow-sm border p-4">
+          <h4 className="text-md font-medium text-gray-900 mb-3 flex items-center">
+            <span className="text-lg mr-2">{currentAgent?.avatar}</span>
+            Sample Queries for {currentAgent?.name}
+          </h4>
           <div className="space-y-2">
             {demoQueries[selectedAgent]?.map((query, index) => (
               <button
                 key={index}
                 onClick={() => handleDemoQuery(query)}
-                className="w-full p-3 text-left text-sm bg-gray-50 hover:bg-gray-100 rounded-lg border transition-colors"
+                className="w-full p-3 text-left text-sm bg-gray-50 hover:bg-blue-50 hover:border-blue-200 rounded-lg border border-gray-200 transition-colors"
               >
                 {query}
               </button>
             ))}
+            
+            {!demoQueries[selectedAgent] && (
+              <div className="text-center py-4 text-gray-500">
+                <p className="text-sm">No sample queries available for this agent yet.</p>
+              </div>
+            )}
+          </div>
+          
+          {/* Agent Stats */}
+          <div className="mt-4 pt-4 border-t border-gray-200">
+            <div className="grid grid-cols-2 gap-4 text-center text-xs">
+              <div>
+                <div className="font-semibold text-green-600">{currentAgent?.expertise?.length || 0}</div>
+                <div className="text-gray-600">Specialties</div>
+              </div>
+              <div>
+                <div className="font-semibold text-blue-600">Online</div>
+                <div className="text-gray-600">Status</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -137,22 +504,38 @@ const AgentChat = () => {
       {/* Chat Interface */}
       <div className="lg:col-span-3 bg-white rounded-lg shadow-sm border flex flex-col">
         {/* Chat Header */}
-        <div className="flex items-center justify-between p-4 border-b bg-gradient-to-r from-salesforce-blue to-salesforce-darkblue text-white rounded-t-lg">
+        <div className="flex items-center justify-between p-4 border-b bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-t-lg">
           <div className="flex items-center">
-            <span className="text-2xl mr-3">{currentAgent?.avatar}</span>
+            <span className="text-3xl mr-3">{currentAgent?.avatar}</span>
             <div>
-              <h3 className="font-semibold">{currentAgent?.name}</h3>
+              <h3 className="font-semibold text-lg">{currentAgent?.name}</h3>
               <p className="text-sm opacity-90">{currentAgent?.description}</p>
+              <div className="flex items-center mt-1">
+                <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full mr-2">
+                  {currentAgent?.category}
+                </span>
+                <div className="flex items-center">
+                  <CheckCircle className="w-3 h-3 mr-1" />
+                  <span className="text-xs">Online</span>
+                </div>
+              </div>
             </div>
           </div>
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center">
-              <CheckCircle className="w-4 h-4 mr-1" />
-              <span className="text-sm">Ready</span>
+          <div className="text-right">
+            <div className="grid grid-cols-2 gap-4 text-xs">
+              <div>
+                <div className="font-semibold">95%</div>
+                <div className="opacity-75">Confidence</div>
+              </div>
+              <div>
+                <div className="font-semibold">1.2s</div>
+                <div className="opacity-75">Avg Response</div>
+              </div>
             </div>
-            <div className="text-right">
-              <p className="text-sm">Confidence: {agentStatus.confidence}%</p>
-              <p className="text-xs opacity-75">Avg Response: {agentStatus.avgResponseTime}s</p>
+            <div className="mt-2">
+              <span className="text-xs opacity-75">
+                {currentAgent?.expertise?.length} specialties
+              </span>
             </div>
           </div>
         </div>
@@ -161,13 +544,17 @@ const AgentChat = () => {
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {messages.length === 0 && (
             <div className="text-center py-8">
-              <Bot className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <div className="text-4xl mb-4">{currentAgent?.avatar}</div>
               <h3 className="text-lg font-medium text-gray-900 mb-2">
-                Ready to help with {currentAgent?.name.toLowerCase()}
+                {currentAgent?.name} Ready to Help
               </h3>
-              <p className="text-gray-600">
-                Ask me anything about {currentAgent?.expertise.join(', ').toLowerCase()}
+              <p className="text-gray-600 mb-4">
+                Specialized in {currentAgent?.expertise?.slice(0,3).join(', ').toLowerCase()}
               </p>
+              <div className="inline-flex items-center px-3 py-1 rounded-full text-xs bg-blue-50 text-blue-700">
+                <span className="w-2 h-2 bg-blue-400 rounded-full mr-2"></span>
+                {currentAgent?.category} Domain Expert
+              </div>
             </div>
           )}
           

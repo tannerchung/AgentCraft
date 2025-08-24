@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Requ
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Dict, Any, Optional, List
+from contextlib import asynccontextmanager
 import json
 import time
 import asyncio
@@ -32,7 +33,18 @@ except ImportError:
         AI_POWERED = False
         logging.warning("AgentCraft modules not available, using mock responses")
 
-app = FastAPI(title="AgentCraft API", version="1.0.0")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    if AGENTCRAFT_AVAILABLE:
+        logging.info("AgentCraft system initialized successfully with enhanced technical support agent")
+    else:
+        logging.info("Running in demo mode with mock responses")
+    yield
+    # Shutdown
+    logging.info("AgentCraft system shutting down")
+
+app = FastAPI(title="AgentCraft API", version="1.0.0", lifespan=lifespan)
 
 # CORS middleware for React frontend
 app.add_middleware(
@@ -689,6 +701,208 @@ This analysis draws from my specialized competitive intelligence database and re
     }
 
     return responses.get(agent_type, responses["technical"])
+
+# Enhanced API endpoints for Qdrant, Galileo, and HITL
+
+@app.get("/api/qdrant-metrics")
+async def get_qdrant_metrics():
+    """Get Qdrant vector database performance metrics"""
+    try:
+        # In production, import and use actual Qdrant service
+        # from src.services.qdrant_service import qdrant_service
+        # return qdrant_service.get_metrics()
+        
+        # Mock metrics for demo
+        return {
+            "status": "healthy",
+            "collection": "agentcraft_knowledge",
+            "vector_count": 1247,
+            "indexed_points": 1247,
+            "embedding_dimension": 384,
+            "distance_metric": "cosine",
+            "search_performance": {
+                "average_latency_ms": 12,
+                "p95_latency_ms": 25,
+                "p99_latency_ms": 45,
+                "queries_per_second": 150
+            },
+            "knowledge_metrics": {
+                "search_relevance": 0.92,
+                "response_quality": 94,
+                "knowledge_coverage": 87,
+                "avg_similarity_score": 0.89
+            }
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@app.get("/api/galileo-metrics")
+async def get_galileo_metrics():
+    """Get Galileo observability metrics"""
+    try:
+        # Mock Galileo metrics for demo
+        return {
+            "conversation_quality": 4.6,
+            "token_usage": {
+                "average_tokens_per_query": 3247,
+                "total_tokens_today": 89532,
+                "cost_per_token": 0.0003
+            },
+            "model_performance": {
+                "latency_ms": 145,
+                "error_rate": 0.02,
+                "confidence_score": 0.94,
+                "hallucination_rate": 0.008
+            },
+            "agent_insights": {
+                "top_performing_agent": "Technical Support",
+                "avg_resolution_confidence": 0.91,
+                "improvement_over_baseline": 12.3
+            },
+            "real_time_stats": {
+                "active_conversations": 23,
+                "queries_per_minute": 8.5,
+                "success_rate": 96.2
+            }
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@app.get("/api/hitl-metrics")
+async def get_hitl_metrics():
+    """Get Human-in-the-Loop metrics"""
+    try:
+        # In production, import and use actual HITL service
+        # from src.services.hitl_service import hitl_service
+        # return hitl_service.get_escalation_metrics()
+        
+        # Mock HITL metrics for demo
+        return {
+            "total_escalations": 47,
+            "resolved_escalations": 44,
+            "escalation_rate": 3.8,
+            "avg_resolution_time": "2.3 minutes",
+            "feedback_incorporated": 39,
+            "performance_improvement": "12.5%",
+            "queue_length": 3,
+            "learning_cache_size": 156,
+            "escalation_reasons": {
+                "low_confidence": 18,
+                "complex_issue": 12,
+                "negative_sentiment": 8,
+                "missing_information": 6,
+                "user_requested": 3
+            },
+            "operator_metrics": {
+                "active_operators": 3,
+                "avg_response_time": "45 seconds",
+                "customer_satisfaction": 4.9,
+                "teaching_sessions": 12
+            }
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@app.post("/api/vector-search")
+async def vector_search(request: Dict[str, Any]):
+    """Perform vector search using Qdrant"""
+    try:
+        query = request.get("query", "")
+        limit = request.get("limit", 5)
+        
+        # In production, use actual Qdrant service
+        # from src.services.qdrant_service import qdrant_service
+        # results = qdrant_service.search(query, limit)
+        
+        # Mock search results for demo
+        mock_results = [
+            {
+                "id": "kb_001",
+                "title": "Webhook Signature Verification Guide",
+                "content": "Complete guide to implementing webhook signature verification...",
+                "category": "Technical Integration",
+                "tags": ["webhook", "signature", "security"],
+                "similarity_score": 0.94,
+                "updated_at": "2024-08-20T14:30:00Z"
+            },
+            {
+                "id": "kb_007", 
+                "title": "Debugging 403 Forbidden Errors",
+                "content": "Systematic approach to resolving 403 errors...",
+                "category": "Troubleshooting",
+                "tags": ["403", "forbidden", "debugging"],
+                "similarity_score": 0.89,
+                "updated_at": "2024-08-20T15:00:00Z"
+            }
+        ]
+        
+        return {
+            "query": query,
+            "results": mock_results[:limit],
+            "total_found": len(mock_results),
+            "search_time_ms": 12
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@app.get("/api/enhanced-metrics")
+async def get_enhanced_metrics():
+    """Get comprehensive metrics for enhanced dashboard"""
+    try:
+        return {
+            "real_time": {
+                "timestamp": datetime.utcnow().isoformat(),
+                "total_queries": 5432,
+                "queries_per_minute": 8.5,
+                "active_conversations": 23,
+                "avg_response_time": 1.2,
+                "resolution_rate": 96.2,
+                "satisfaction_score": 4.8,
+                "cost_per_query": 0.12,
+                "escalation_rate": 3.8,
+                "first_contact_resolution": 92.5
+            },
+            "qdrant_performance": {
+                "search_relevance": 0.92,
+                "knowledge_coverage": 87,
+                "avg_latency_ms": 12,
+                "throughput_qps": 150
+            },
+            "galileo_insights": {
+                "conversation_quality": 4.6,
+                "token_usage": 3247,
+                "model_latency": 145,
+                "error_rate": 0.02
+            },
+            "hitl_stats": {
+                "escalation_rate": 3.8,
+                "avg_escalation_time": "2.3 minutes",
+                "learning_retention": 94,
+                "feedback_incorporated": 39
+            },
+            "cost_analysis": {
+                "agentcraft": {
+                    "infrastructure": 186,
+                    "ai_services": 80,
+                    "total": 266
+                },
+                "agentforce": {
+                    "licensing": 2000,
+                    "infrastructure": 500,
+                    "total": 2500
+                },
+                "monthly_savings": 2234,
+                "roi_percentage": 839
+            },
+            "competitive_advantages": [
+                {"metric": "Response Time", "agentcraft": 1.2, "agentforce": 8.5, "improvement": "86% faster"},
+                {"metric": "Cost per Query", "agentcraft": 0.12, "agentforce": 2.0, "improvement": "94% cheaper"},
+                {"metric": "Resolution Rate", "agentcraft": 96.2, "agentforce": 85, "improvement": "13% higher"},
+                {"metric": "Escalation Rate", "agentcraft": 3.8, "agentforce": 15, "improvement": "75% lower"}
+            ]
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 if __name__ == "__main__":
     import uvicorn
