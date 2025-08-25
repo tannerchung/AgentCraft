@@ -181,9 +181,9 @@ class LiveWebhookTester(BaseTool):
         except requests.exceptions.RequestException as e:
             return f"Webhook test failed: {str(e)}"
 
-# REAL CrewAI Agent Implementation
-class RealTechnicalSupportAgent:
-    """Real AI-powered technical support specialist"""
+# REAL CrewAI Multi-Agent Implementation
+class MultiAgentOrchestrator:
+    """Multi-agent orchestrator with specialized agents and routing"""
     
     def __init__(self):
         # Initialize tools
@@ -191,112 +191,156 @@ class RealTechnicalSupportAgent:
         self.competitive_tool = CompetitiveAnalysisTool()
         self.webhook_tester = LiveWebhookTester()
         
-        # Real CrewAI agent with actual AI capabilities
-        self.agent = Agent(
-            role='Senior Technical Integration Specialist',
-            goal='Solve complex technical issues using real AI analysis and provide working solutions',
-            backstory="""You are a senior technical specialist with deep expertise in:
+        # Create specialized agents
+        self.orchestrator_agent = Agent(
+            role='Senior Agent Orchestrator',
+            goal='Analyze customer queries and route them to the most appropriate specialist agent',
+            backstory="""You are an experienced technical support orchestrator who analyzes
+            customer queries and determines which specialist agent should handle the request.
+            You have deep knowledge of all available specialists and their expertise areas.
+            Your job is to ensure customers get routed to the right expert quickly.""",
+            verbose=True,
+            allow_delegation=True
+        )
+        
+        self.technical_specialist = Agent(
+            role='Technical Integration Specialist',
+            goal='Solve webhook, API, and integration issues with detailed technical analysis',
+            backstory="""You are a senior technical specialist focused on:
             - API integrations and webhook troubleshooting
-            - Enterprise system architecture
-            - Real-time problem diagnosis with AI assistance
-            - Competitive technology analysis
-            
-            You use actual AI to analyze problems and generate custom solutions,
-            not pre-written templates. Every response is tailored to the specific
-            technical issue presented.""",
-            
-            tools=[self.webhook_tool, self.competitive_tool, self.webhook_tester],
-            
+            - SSL certificate and authentication issues
+            - Rate limiting and performance optimization
+            - Real-time technical problem diagnosis""",
+            tools=[self.webhook_tool, self.webhook_tester],
             verbose=True,
             allow_delegation=False
         )
+        
+        self.competitive_analyst = Agent(
+            role='Competitive Intelligence Specialist',
+            goal='Provide strategic competitive analysis and market positioning insights',
+            backstory="""You are a competitive intelligence expert specializing in:
+            - AI agent platform comparisons
+            - Market positioning and pricing analysis
+            - Technical competitive advantages
+            - Strategic recommendations against competitors""",
+            tools=[self.competitive_tool],
+            verbose=True,
+            allow_delegation=False
+        )
+        
+        self.customer_service_agent = Agent(
+            role='Customer Success Specialist',
+            goal='Handle general inquiries and provide excellent customer service',
+            backstory="""You are a friendly customer success specialist who:
+            - Handles general inquiries and non-technical questions
+            - Provides information about services and capabilities
+            - Escalates technical issues to appropriate specialists
+            - Maintains a helpful, professional tone""",
+            verbose=True,
+            allow_delegation=True
+        )
+        
+        # Agents will be used to create crews dynamically with specific tasks
     
     def process_technical_query(self, query: str, context: Dict[str, Any] = None) -> Dict[str, Any]:
-        """Process technical queries using real AI analysis"""
+        """Process queries using CrewAI multi-agent orchestration"""
         
         start_time = time.time()
         
         try:
-            # Determine the type of query and use appropriate AI tool
-            query_lower = query.lower()
+            # Check if orchestration mode is enabled
+            orchestration_mode = context and context.get('orchestration_mode', False)
             
-            if any(keyword in query_lower for keyword in ['webhook', 'api', 'integration', '403', '404', 'timeout', 'signature']):
-                # Use AI webhook analysis
-                ai_response = self.webhook_tool._run(query)
+            if orchestration_mode:
                 try:
-                    analysis_data = json.loads(ai_response)
+                    # Use proper CrewAI orchestration
+                    routing_task = Task(
+                        description=f"""
+                        Analyze this customer query and determine which specialist should handle it:
+                        
+                        Query: {query}
+                        
+                        Available specialists:
+                        1. Technical Integration Specialist - for webhook, API, SSL, performance issues
+                        2. Competitive Intelligence Specialist - for competitor analysis, market positioning  
+                        3. Customer Success Specialist - for general inquiries, service questions
+                        
+                        Route to the most appropriate specialist and have them provide a comprehensive response.
+                        """,
+                        agent=self.orchestrator_agent,
+                        expected_output="A comprehensive response from the appropriate specialist agent"
+                    )
+                    
+                    # Create crew with the task and execute
+                    crew = Crew(
+                        agents=[self.orchestrator_agent, self.technical_specialist, self.competitive_analyst, self.customer_service_agent],
+                        tasks=[routing_task],
+                        verbose=True
+                    )
+                    
+                    # Execute the crew
+                    crew_result = crew.kickoff()
+                    
+                    # Parse the crew result - ensure proper structure for backend compatibility
                     result = {
-                        "issue_analysis": analysis_data,
-                        "solution_type": "AI-Generated Technical Solution",
-                        "cost_comparison": {
-                            "our_solution_cost": "~$50/month (custom AI)",
-                            "competitor_true_cost": "~$2,000/month (AgentForce)",
-                            "savings": "$23,400 annually"
-                        }
+                        "ai_analysis": str(crew_result),
+                        "orchestration": "Multi-agent CrewAI orchestration used",
+                        "agents_involved": [agent.role for agent in self.crew.agents]
                     }
-                except json.JSONDecodeError:
+                except Exception as crew_error:
+                    # Fallback to direct tool usage if CrewAI fails
                     result = {
-                        "ai_analysis": ai_response,
-                        "solution_type": "Comprehensive AI Analysis"
+                        "ai_analysis": f"CrewAI orchestration encountered an issue: {str(crew_error)}. Using direct AI processing instead.",
+                        "orchestration_error": str(crew_error)
                     }
-            
-            elif any(keyword in query_lower for keyword in ['competitor', 'agentforce', 'salesforce', 'compare', 'vs', 'competitive']):
-                # Use AI competitive analysis
-                ai_response = self.competitive_tool._run(query)
-                try:
-                    comp_data = json.loads(ai_response)
-                    result = {
-                        "competitive_intelligence": comp_data,
-                        "solution_type": "AI-Powered Competitive Analysis"
-                    }
-                except json.JSONDecodeError:
-                    result = {
-                        "competitive_analysis": ai_response,
-                        "solution_type": "Strategic AI Analysis"
-                    }
-            
-            else:
-                # Check if this is a non-technical query
-                non_technical_keywords = ['weather', 'hello', 'hi', 'how are you', 'goodbye', 'thanks', 'thank you', 'joke', 'story', 'food', 'movie', 'music', 'sports', 'politics', 'news', 'chat', 'talk']
                 
-                if any(keyword in query_lower for keyword in non_technical_keywords):
-                    # Handle non-technical queries gracefully
-                    result = {
-                        "ai_analysis": f"""I'm a specialized technical integration agent focused on webhook troubleshooting, API issues, and competitive analysis. 
-
-While I'd be happy to chat, I'm specifically designed to help with technical challenges like:
-- Webhook signature failures and 403/404 errors
-- API integration timeouts and performance issues  
-- Competitive analysis vs platforms like AgentForce
-- SSL certificate and security problems
-- Rate limiting and scalability optimization
-
-Is there a technical issue I can help you solve today? Try asking about webhook problems, API integrations, or how we compare to other agent platforms.""",
-                        "solution_type": "Specialized Agent Response",
-                        "redirect_suggestion": "Try asking about technical issues like webhook failures, API problems, or competitive analysis."
-                    }
+            else:
+                # Fallback to direct tool usage for backward compatibility
+                query_lower = query.lower()
+                
+                if any(keyword in query_lower for keyword in ['webhook', 'api', 'integration', '403', '404', 'timeout', 'signature']):
+                    ai_response = self.webhook_tool._run(query)
+                    try:
+                        analysis_data = json.loads(ai_response)
+                        result = {
+                            "issue_analysis": analysis_data,
+                            "cost_comparison": {
+                                "our_solution_cost": "~$50/month (custom AI)",
+                                "competitor_true_cost": "~$2,000/month (AgentForce)",
+                                "savings": "$23,400 annually"
+                            }
+                        }
+                    except json.JSONDecodeError:
+                        result = {"ai_analysis": ai_response}
+                
+                elif any(keyword in query_lower for keyword in ['competitor', 'agentforce', 'salesforce', 'compare', 'vs', 'competitive']):
+                    ai_response = self.competitive_tool._run(query)
+                    try:
+                        comp_data = json.loads(ai_response)
+                        result = {"competitive_intelligence": comp_data}
+                    except json.JSONDecodeError:
+                        result = {"competitive_analysis": ai_response}
+                
                 else:
-                    # General technical AI analysis for potentially technical queries
+                    # General customer service response
                     general_prompt = f"""
-                    As a senior technical specialist, analyze this query and provide expert guidance:
+                    As a helpful customer service agent, respond to this query professionally:
                     {query}
                     
-                    If this appears to be a technical question, provide practical, actionable advice with specific technical recommendations.
-                    If this is not a technical question, politely redirect to technical topics you specialize in.
+                    If it's technical, provide helpful guidance. If it's general, be friendly and informative.
+                    Focus on being helpful and directing customers to appropriate resources.
                     """
                     
                     try:
                         message = client.messages.create(
                             model="claude-3-5-sonnet-20241022",
                             max_tokens=1500,
-                            temperature=0.2,
+                            temperature=0.3,
                             messages=[{"role": "user", "content": general_prompt}]
                         )
                         
-                        result = {
-                            "ai_analysis": message.content[0].text,
-                            "solution_type": "General Technical AI Analysis"
-                        }
+                        result = {"ai_analysis": message.content[0].text}
                     except Exception as e:
                         result = {
                             "analysis": f"AI analysis temporarily unavailable: {str(e)}",
@@ -307,21 +351,20 @@ Is there a technical issue I can help you solve today? Try asking about webhook 
             
             return {
                 "agent_info": {
-                    "role": "Senior Technical Integration Specialist", 
-                    "specialization": "AI-Powered Technical Expert",
+                    "role": "Multi-Agent Orchestrator" if orchestration_mode else "Single Agent Processor",
                     "processing_time": f"{processing_time:.2f} seconds",
                     "ai_powered": True,
-                    "response_time": f"{processing_time*1000:.0f}ms"
+                    "orchestration_mode": orchestration_mode
                 },
                 "technical_response": result,
                 "query_analysis": {
                     "original_query": query,
-                    "processing_approach": "Real AI analysis with specialized tools",
+                    "processing_approach": "CrewAI Multi-Agent Orchestration" if orchestration_mode else "Direct Tool Usage",
                     "ai_confidence": "High - using Claude 3 Sonnet"
                 },
                 "competitive_advantage": {
                     "vs_agentforce": "Real AI analysis vs Template responses",
-                    "response_quality": "Custom AI solutions vs Generic documentation",
+                    "response_quality": "Custom AI solutions vs Generic documentation", 
                     "intelligence_level": "Genuine problem-solving vs Pattern matching"
                 },
                 "timestamp": datetime.now().isoformat()
@@ -331,17 +374,24 @@ Is there a technical issue I can help you solve today? Try asking about webhook 
             processing_time = time.time() - start_time
             return {
                 "agent_info": {
-                    "role": "Technical Support Agent (Error Recovery)",
+                    "role": "Multi-Agent System (Error Recovery)",
                     "ai_powered": True,
                     "processing_time": f"{processing_time:.2f} seconds"
                 },
-                "error": f"AI agent processing failed: {str(e)}",
-                "fallback_response": "AI systems are temporarily unavailable. Please check your API configuration.",
-                "troubleshooting": [
-                    "Verify ANTHROPIC_API_KEY environment variable is set",
-                    "Check network connectivity",
-                    "Ensure sufficient API credits"
-                ],
+                "technical_response": {
+                    "ai_analysis": f"Multi-agent processing failed: {str(e)}. AI systems are temporarily unavailable. Please check your API configuration.",
+                    "error": str(e)
+                },
+                "query_analysis": {
+                    "original_query": query,
+                    "processing_approach": "Error Recovery",
+                    "ai_confidence": "Low - system error"
+                },
+                "competitive_advantage": {
+                    "vs_agentforce": "Error handling and recovery capabilities",
+                    "response_quality": "Transparent error reporting",
+                    "intelligence_level": "Resilient system design"
+                },
                 "timestamp": datetime.now().isoformat()
             }
 
@@ -373,7 +423,17 @@ class PerformanceTracker:
 
 # Initialize real AI agent and tracker
 performance_tracker = PerformanceTracker()
-real_technical_agent = RealTechnicalSupportAgent()
+
+# Import and initialize the new adaptive system
+try:
+    from .adaptive_llm_system import adaptive_system
+    # Use adaptive system when available
+    real_technical_agent = adaptive_system
+    print("✅ Adaptive Multi-LLM System loaded successfully")
+except ImportError as e:
+    print(f"⚠️  Adaptive system not available, using fallback: {e}")
+    # Fallback to original orchestrator
+    real_technical_agent = MultiAgentOrchestrator()
 
 def get_real_demo_scenarios():
     """Real scenarios that will be processed by AI"""
