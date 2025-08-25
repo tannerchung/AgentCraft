@@ -1,8 +1,8 @@
-# 🛠️ AgentCraft - Specialized AI Agent Architecture
+# 🛠️ AgentCraft - Advanced Multi-Agent AI System
 
-**Production-ready multi-agent AI system with domain expertise, real-time tracking, and competitive intelligence**
+**Production-ready multi-agent AI system with conversation memory, knowledge retrieval, real-time tracking, and transparent citations**
 
-AgentCraft demonstrates how specialized AI agents can deliver superior outcomes through deep technical knowledge, real-time WebSocket communication, and flexible architecture. Built for scalable deployment with comprehensive observability and database persistence.
+AgentCraft demonstrates how specialized AI agents can deliver superior outcomes through deep technical knowledge, conversational context awareness, external knowledge integration, and comprehensive debug transparency. Built for scalable deployment with database persistence, vector search, and full source attribution.
 
 ## 🎯 Project Overview
 
@@ -12,12 +12,16 @@ AgentCraft showcases a **production-ready multi-agent AI system** that combines 
 
 | **Feature** | **Implementation** |
 |-------------|-------------------|
-| ✅ **Multi-Agent Architecture** | 20+ specialized agents across technical, business, and industry domains |
-| ✅ **Real-Time WebSocket Communication** | Live agent status and execution monitoring |
-| ✅ **Database-Backed Agent Management** | PostgreSQL persistence with performance tracking |
-| ✅ **Adaptive Multi-LLM System** | Intelligent model selection (Claude, GPT-4, etc.) |
-| ✅ **Competitive Intelligence** | Real-time market analysis vs platform restrictions |
-| ✅ **Production-Ready Architecture** | FastAPI + React with comprehensive error handling |
+| 🧠 **Conversation Memory System** | Persistent conversation context across sessions with smart context management |
+| 🌐 **External Knowledge Integration** | Real-time web scraping with Firecrawl + vector database search with Qdrant |
+| 📚 **Transparent Source Citations** | Automatic citation of external sources and AI-generated content |
+| 🔍 **Enhanced Debug Transparency** | Comprehensive visibility into service usage, knowledge retrieval, and processing |
+| ✅ **Multi-Agent Architecture** | 20+ specialized agents with real-time collaboration |
+| ⚡ **Real-Time WebSocket Communication** | Live agent status and execution monitoring |
+| 🗄️ **Database-Backed Agent Management** | PostgreSQL/Neon persistence with performance tracking |
+| 🤖 **Adaptive Multi-LLM System** | Intelligent model selection (Claude, GPT-4) with fallback mechanisms |
+| 📊 **Competitive Intelligence** | Unrestricted market analysis vs platform limitations |
+| 🏭 **Production-Ready Architecture** | FastAPI + React with comprehensive error handling and resilience |
 
 ## 🏗️ Architecture
 
@@ -51,6 +55,48 @@ agentcraft/
 └── tests/                            # Comprehensive test suite
 ```
 
+## 🧠 Advanced Conversation & Knowledge System
+
+### **Conversation Memory**
+- **Persistent Context**: Maintains conversation history across sessions
+- **Smart Context Management**: Automatically manages context window (last 6 messages)
+- **Session Tracking**: Unique session IDs for conversation continuity
+- **Context Injection**: Seamlessly integrates previous conversation into new responses
+
+### **External Knowledge Integration**
+- **Firecrawl Web Scraping**: Real-time content retrieval from official documentation
+- **Qdrant Vector Database**: Semantic search through knowledge base collections
+- **Smart Content Detection**: Automatically parses multiple content formats
+- **Knowledge Analysis**: Extracts topics, actionable steps, and content structure
+
+### **Source Attribution & Citations**
+- **External Source Citations**: Proper attribution with URLs for retrieved content
+- **AI-Generated Disclaimers**: Clear labeling of AI-inferred responses
+- **Debug Transparency**: Complete visibility into knowledge sources and usage
+- **Citation Tracking**: Debug info shows citation inclusion and formats
+
+### **Debug Console Features**
+```json
+{
+  "service_usage": {
+    "services_attempted": ["Qdrant Vector DB", "Firecrawl Web Scraping", "Claude AI"],
+    "services_successful": ["Firecrawl Web Scraping", "Claude AI + Firecrawl Data"],
+    "data_sources_used": ["Zapier Official Documentation"]
+  },
+  "knowledge_analysis": {
+    "content_type": "documentation",
+    "key_topics": ["webhooks", "api_integration", "zapier_platform"],
+    "actionable_steps": 6,
+    "knowledge_depth": "comprehensive"
+  },
+  "citation_tracking": {
+    "citation_included": true,
+    "source_url": "https://zapier.com/help/create/webhooks",
+    "citation_format": "markdown_with_source_url"
+  }
+}
+```
+
 ## 🚀 Quick Start
 
 ### Prerequisites
@@ -62,10 +108,17 @@ Create a `.env` file based on `.env.example`:
 ANTHROPIC_API_KEY=your_claude_api_key
 OPENAI_API_KEY=your_openai_api_key
 
+# External Knowledge Integration
+FIRECRAWL_API_KEY=your_firecrawl_api_key     # Web scraping for real-time content
+QDRANT_URL=your_qdrant_cluster_url           # Vector database for semantic search
+QDRANT_API_KEY=your_qdrant_api_key           # Vector database authentication
+
+# Database & Storage
+DATABASE_URL=postgresql://user@localhost:5432/agentcraft_db  # PostgreSQL/Neon cloud
+
 # Optional for advanced features
-GALILEO_API_KEY=your_galileo_api_key
-GALILEO_PROJECT=AgentCraft
-DATABASE_URL=postgresql://user@localhost:5432/agentcraft_db
+GALILEO_API_KEY=your_galileo_api_key         # AI observability platform
+GALILEO_PROJECT=AgentCraft                   # Project identifier
 ```
 
 ### Installation & Launch
@@ -83,6 +136,10 @@ python main.py --streamlit
 - **React Frontend**: http://localhost:3000 - Main multi-agent interface
 - **API Documentation**: http://localhost:8000/docs - FastAPI interactive docs
 - **WebSocket Endpoint**: ws://localhost:8000/api/ws/agent-tracking - Real-time updates
+- **Debug Endpoints**:
+  - **Knowledge Debug**: `/api/debug/knowledge/{query}` - View retrieved knowledge content
+  - **Conversation History**: `/api/conversation/{session_id}` - View conversation context
+  - **Active Sessions**: `/api/conversations` - List all active conversation sessions
 - **Streamlit Demo**: http://localhost:5000 - Alternative dashboard interface
 
 ## 🤖 Multi-Agent System
@@ -126,6 +183,18 @@ python main.py --streamlit
 - Live agent status indicators (IDLE, ANALYZING, PROCESSING, COLLABORATING)
 - Real-time progress bars and task descriptions
 - WebSocket connection management with automatic reconnection
+
+#### **Conversation Persistence**
+- **Session Management**: Unique session IDs for conversation tracking
+- **Context Awareness**: Agents reference previous messages in conversations
+- **Memory Optimization**: Smart truncation (last 10 messages, context window of 6)
+- **Cross-Session Continuity**: Resume conversations across page reloads
+
+#### **Knowledge Integration Pipeline**
+- **Query Analysis**: Automatic detection of queries requiring external knowledge
+- **Service Orchestration**: Parallel attempts to Qdrant vector DB and Firecrawl web scraping
+- **Content Processing**: Smart extraction from multiple response formats
+- **Response Enhancement**: AI processing with retrieved knowledge context
 
 #### **Competitive Intelligence**
 - Real-time market analysis and competitor positioning
@@ -240,12 +309,29 @@ For production deployment on Replit:
 
 ## 💡 Key Technical Achievements
 
+### **Conversation Intelligence**
+- **Persistent Memory System**: Session-based conversation tracking with context management
+- **Context-Aware Responses**: Agents maintain conversation continuity across interactions
+- **Smart Memory Optimization**: Automatic context window management and history truncation
+
+### **Knowledge Integration**
+- **External Knowledge Retrieval**: Real-time web scraping with Firecrawl integration
+- **Vector Database Search**: Semantic search capabilities with Qdrant cloud integration
+- **Content Analysis Engine**: Automatic topic extraction, actionable step detection, and structure analysis
+- **Multi-Format Processing**: Smart content extraction from various response formats
+
+### **Transparency & Attribution**
+- **Automatic Source Citations**: Proper attribution for external sources with URLs
+- **Knowledge Provenance Tracking**: Complete visibility into information sources
+- **Debug Console**: Comprehensive service usage, knowledge analysis, and citation tracking
+- **Response Auditing**: Full transparency in AI decision-making and knowledge utilization
+
+### **Core Infrastructure**
 - **Real Multi-Agent Orchestration**: Production-ready agent delegation and collaboration
 - **WebSocket Real-Time Tracking**: Live execution monitoring and progress updates
-- **Database-Backed Management**: Scalable agent persistence and configuration
+- **Database-Backed Management**: Scalable agent persistence with PostgreSQL/Neon cloud
 - **AI Observability**: Complete pipeline monitoring with Galileo integration
-- **Adaptive Intelligence**: Multi-LLM orchestration with intelligent routing
-- **Competitive Intelligence**: Unrestricted market analysis capabilities
+- **Adaptive Intelligence**: Multi-LLM orchestration with intelligent routing and fallbacks
 
 ## 🎯 Business Value
 
@@ -261,18 +347,44 @@ For production deployment on Replit:
 - **Transparent Operations**: Complete visibility into AI operations
 
 ### **Strategic Advantages**
-1. **Real-Time Transparency**: Live execution tracking and debug capabilities
-2. **Production Resilience**: Comprehensive error handling and recovery
-3. **Scalable Architecture**: Database-backed with performance optimization
-4. **Advanced Observability**: Full AI pipeline monitoring and optimization
-5. **Competitive Intelligence**: Unrestricted market analysis capabilities
+1. **Conversational Intelligence**: Persistent memory with context-aware responses across sessions
+2. **External Knowledge Integration**: Real-time access to current information via web scraping and vector search
+3. **Complete Transparency**: Full source attribution with citations and comprehensive debug visibility
+4. **Knowledge Provenance**: Track exactly where information comes from and how it's processed
+5. **Real-Time Transparency**: Live execution tracking and debug capabilities
+6. **Production Resilience**: Comprehensive error handling, fallbacks, and recovery mechanisms
+7. **Scalable Architecture**: Database-backed with performance optimization and cloud integration
+8. **Advanced Observability**: Full AI pipeline monitoring with service usage analytics
+
+## 🚀 Latest Enhancements
+
+### **Conversation System (v2.0)**
+- **Memory Persistence**: Conversations maintain context across sessions
+- **Context Management**: Smart truncation and relevance filtering
+- **Session Tracking**: Unique identifiers for conversation continuity
+
+### **Knowledge Integration (v2.0)**
+- **Firecrawl Integration**: Real-time web scraping from official documentation
+- **Qdrant Vector Database**: Semantic search through knowledge collections
+- **Content Analysis**: Automatic topic extraction and structure detection
+
+### **Transparency Features (v2.0)**
+- **Source Citations**: Automatic attribution for all external sources
+- **Debug Console**: Complete visibility into service usage and knowledge retrieval
+- **Knowledge Tracking**: See exactly what content is retrieved and how it's used
+
+### **Enhanced Debug Endpoints**
+- **`/api/debug/knowledge/{query}`**: View retrieved knowledge content and analysis
+- **`/api/conversation/{session_id}`**: Access conversation history and context
+- **`/api/conversations`**: List all active conversation sessions with statistics
 
 ---
 
-**AgentCraft** - Production-ready specialized AI agent architecture that delivers superior outcomes through domain expertise, real-time observability, and enterprise-grade reliability.
+**AgentCraft v2.0** - Advanced multi-agent AI system with conversational intelligence, external knowledge integration, and complete transparency. Delivering superior outcomes through persistent memory, real-time knowledge retrieval, and comprehensive source attribution.
 
 ### 🔗 Quick Links
 - **Live Demo**: Click the Run button above
 - **API Docs**: `/docs` endpoint when running
+- **Debug Knowledge**: `/api/debug/knowledge/zapier%20webhook` - Test knowledge retrieval
 - **WebSocket Test**: `/api/ws/stats` for connection info
 - **Health Check**: `/` endpoint for system status
