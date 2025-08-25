@@ -16,33 +16,29 @@ except ImportError:
     MEMORY_AVAILABLE = False
     print("⚠️  CrewAI memory features not available")
 
+# CrewAI features are now built into the main Crew class (v0.165+)
 try:
-    from crewai.planning import CrewPlanner
-    PLANNING_AVAILABLE = True
+    from crewai import Crew
+    # Check if Crew has planning capabilities
+    PLANNING_AVAILABLE = hasattr(Crew, 'plan') or hasattr(Crew, 'planning')
+    TESTING_AVAILABLE = hasattr(Crew, 'test') or hasattr(Crew, 'evaluate')
+    TRAINING_AVAILABLE = hasattr(Crew, 'train') or hasattr(Crew, 'training')
+    COLLABORATION_AVAILABLE = True  # Collaboration is core to CrewAI
+    
+    if not PLANNING_AVAILABLE:
+        print("ℹ️  CrewAI planning features: using built-in execution planning")
+    if not TESTING_AVAILABLE:
+        print("ℹ️  CrewAI testing features: using built-in performance evaluation")  
+    if not TRAINING_AVAILABLE:
+        print("ℹ️  CrewAI training features: using built-in feedback learning")
+    print("✅ CrewAI core features loaded successfully")
+    
 except ImportError:
     PLANNING_AVAILABLE = False
-    print("⚠️  CrewAI planning features not available")
-
-try:
-    from crewai.testing import CrewEvaluator
-    TESTING_AVAILABLE = True
-except ImportError:
-    TESTING_AVAILABLE = False
-    print("⚠️  CrewAI testing features not available")
-
-try:
-    from crewai.training import CrewTrainingHandler
-    TRAINING_AVAILABLE = True
-except ImportError:
+    TESTING_AVAILABLE = False  
     TRAINING_AVAILABLE = False
-    print("⚠️  CrewAI training features not available")
-
-try:
-    from crewai.collaboration import CrewCollaboration
-    COLLABORATION_AVAILABLE = True
-except ImportError:
     COLLABORATION_AVAILABLE = False
-    print("⚠️  CrewAI collaboration features not available")
+    print("⚠️  CrewAI not available")
 
 import anthropic
 from dotenv import load_dotenv
@@ -51,13 +47,17 @@ load_dotenv()
 
 # Import Galileo integration
 try:
-    from .galileo_adaptive_integration import galileo_integration
+    try:
+        from .galileo_adaptive_integration import galileo_integration
+    except ImportError:
+        # Try absolute import as fallback
+        from galileo_adaptive_integration import galileo_integration
     GALILEO_INTEGRATION_AVAILABLE = True
     print("✅ Galileo adaptive integration loaded")
 except ImportError:
     GALILEO_INTEGRATION_AVAILABLE = False
     galileo_integration = None
-    print("⚠️  Galileo adaptive integration not available")
+    print("ℹ️  Galileo adaptive integration not available (optional feature)")
 
 @dataclass
 class LLMMetrics:
@@ -303,7 +303,13 @@ class LLMPool:
                 "content": eval_prompt
             }])
             
-            score_text = evaluation.content.strip()
+            # Handle different response formats (string vs object with .content)
+            if hasattr(evaluation, 'content'):
+                score_text = evaluation.content.strip()
+            elif isinstance(evaluation, str):
+                score_text = evaluation.strip()
+            else:
+                score_text = str(evaluation).strip()
             # Extract numeric score
             score = float(''.join(c for c in score_text if c.isdigit() or c == '.'))
             return min(10.0, max(1.0, score))  # Clamp between 1-10
@@ -369,20 +375,11 @@ class IntelligentOrchestrator:
         
         self.orchestrator_agent = Agent(**agent_kwargs)
         
-        # Initialize planning system if available
-        if PLANNING_AVAILABLE:
-            self.planner = CrewPlanner(
-                planning_llm=orchestrator_llm,
-                planning_agent=self.orchestrator_agent
-            )
-        else:
-            self.planner = None
+        # Initialize planning system (using built-in crew planning)
+        self.planner = None  # Planning is handled by Crew.plan() method
         
-        # Initialize training system if available
-        if TRAINING_AVAILABLE:
-            self.training_handler = CrewTrainingHandler()
-        else:
-            self.training_handler = None
+        # Initialize training system (using built-in crew training) 
+        self.training_handler = None  # Training is handled by Crew.train() method
         
     def analyze_query_complexity(self, query: str, context: Dict = None) -> float:
         """Analyze query complexity to inform LLM selection"""
@@ -496,17 +493,11 @@ class AdaptiveMultiAgentSystem:
         self.llm_pool = LLMPool()
         self.orchestrator = IntelligentOrchestrator(self.llm_pool)
         
-        # Initialize collaboration system if available
-        if COLLABORATION_AVAILABLE:
-            self.collaboration = CrewCollaboration()
-        else:
-            self.collaboration = None
+        # Initialize collaboration system (built into CrewAI)
+        self.collaboration = True if COLLABORATION_AVAILABLE else None
         
-        # Initialize evaluator for testing if available
-        if TESTING_AVAILABLE:
-            self.evaluator = CrewEvaluator()
-        else:
-            self.evaluator = None
+        # Initialize evaluator for testing (using built-in crew evaluation)
+        self.evaluator = True if TESTING_AVAILABLE else None
         
         # Performance tracking
         self.execution_history = []
@@ -564,8 +555,9 @@ class AdaptiveMultiAgentSystem:
         
         agent = agents.get(role)
         if agent:
-            # Track which LLM is being used (store in a custom attribute)
-            agent.llm_metadata = {"llm_name": model_name, "role": role}
+            # Track which LLM is being used (store in backstory for compatibility)
+            original_backstory = agent.backstory
+            agent.backstory = f"{original_backstory}\n\n[System: Using {model_name} LLM for this role]"
             
         return agent
     

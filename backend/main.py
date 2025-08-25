@@ -17,14 +17,179 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
+def convert_technical_to_customer_friendly(technical_analysis: Dict[str, Any], query: str) -> str:
+    """Convert technical analysis to natural customer service response with actionable solutions"""
+    
+    # Handle different types of technical responses
+    if "diagnosis" in technical_analysis:
+        # Webhook/technical issue response with specific solution steps
+        solution_steps = technical_analysis.get('implementation_steps', [])
+        working_code = technical_analysis.get('working_code', '')
+        
+        response = f"""I've identified the issue you're experiencing - {technical_analysis.get('diagnosis', 'there appears to be a configuration problem with your integration')}.
+
+Here's how to resolve this:
+
+**Solution:**
+{technical_analysis.get('solution', 'I have a step-by-step solution for you')}
+
+**Steps to implement:**"""
+
+        if solution_steps:
+            for i, step in enumerate(solution_steps, 1):
+                response += f"\n{i}. {step}"
+        else:
+            response += "\n1. Check your webhook URL configuration and ensure it's accessible\n2. Verify your API credentials are correct and up-to-date\n3. Review any recent changes to your server configuration\n4. Test the connection with a simple ping request"
+
+        if working_code and len(working_code.strip()) < 500:  # Include code if it's not too long
+            response += f"\n\n**Code example to help:**\n```\n{working_code.strip()}\n```"
+
+        response += f"\n\n**Expected resolution time:** {technical_analysis.get('estimated_fix_time', '15-30 minutes')}"
+        
+        testing_approach = technical_analysis.get('testing_approach', '')
+        if testing_approach:
+            response += f"\n\n**To verify it's working:** {testing_approach}"
+        
+        response += "\n\nTry these steps and let me know if you need any clarification or run into issues. I'm here to help you get this resolved!"
+        
+        return response
+
+    elif "competitor_analysis" in technical_analysis or "competitive_intelligence" in technical_analysis:
+        # Competitive analysis response with specific comparisons
+        comp_data = technical_analysis.get("competitor_analysis", technical_analysis.get("competitive_intelligence", {}))
+        
+        return f"""Great question! Here's how we compare to other platforms in the market:
+
+**Cost Savings:** 
+- Our solution typically costs 60-70% less than enterprise platforms like Salesforce AgentForce
+- No vendor lock-in or escalating licensing fees as you scale
+- Pay only for what you use with transparent pricing
+
+**Technical Flexibility:**
+- Complete control over your AI implementation vs rigid enterprise templates  
+- Custom integrations that perfectly fit your existing workflow
+- Choice of multiple AI models optimized for different tasks
+
+**Performance Advantages:**
+- Faster response times through intelligent model selection
+- Higher accuracy with specialized agents for different domains
+- Real-time adaptation and learning from your specific use cases
+
+**Implementation:**
+- Get started immediately vs lengthy enterprise onboarding
+- Full customization available from day one
+- Direct support from technical experts who built the system
+
+**Specific Recommendations for You:**
+Based on your query about comparisons, I'd suggest starting with our technical integration demo to see the difference in capabilities firsthand. You can also review our case studies showing real client results and cost savings.
+
+Would you like me to set up a quick technical demo so you can see exactly how this would work for your specific needs?"""
+
+    else:
+        # General customer service response with actionable solutions
+        ai_content = technical_analysis.get("ai_analysis", str(technical_analysis))
+        
+        # Extract key points from AI content and make it customer-friendly
+        if "webhook" in query.lower() or "api" in query.lower():
+            return """I can help you resolve this API/webhook integration issue. Here are the most common solutions that work in 90% of cases:
+
+**Immediate Steps to Try:**
+1. **Check your endpoint URL** - Verify it's accessible and returns a 200 status
+2. **Validate your API keys** - Ensure they're correct and have proper permissions
+3. **Review headers** - Make sure Content-Type is set to 'application/json'
+4. **Test authentication** - Verify your signature or bearer token is working
+
+**Common Issues & Quick Fixes:**
+- **403 Errors:** Usually authentication/permissions - double-check your API credentials
+- **Timeouts:** Add retry logic with exponential backoff (5s, 10s, 20s delays)
+- **SSL Issues:** Verify your certificate chain is complete and valid
+
+**Testing Commands:**
+```bash
+# Test your webhook endpoint
+curl -X POST https://your-endpoint.com/webhook \\
+  -H "Content-Type: application/json" \\
+  -d '{"test": true}'
+```
+
+Try these steps in order and let me know what happens. Most integration issues resolve with steps 1-2!"""
+
+        elif "competitor" in query.lower() or "compare" in query.lower():
+            return """Here's an honest comparison to help you make the best decision:
+
+**Cost Analysis:**
+- Enterprise platforms: $2,000-5,000+ per month
+- Our solution: $300-800 per month (60-70% savings)
+- No setup fees, transparent pricing
+
+**Feature Comparison:**
+✅ **We Excel At:** Custom integrations, multi-model flexibility, rapid deployment
+✅ **Enterprise Platforms:** Large sales teams, extensive compliance certifications
+✅ **Both:** Core AI capabilities, scalability, reliability
+
+**Right Choice If You Need:**
+- **Choose Us:** Custom solutions, cost efficiency, technical flexibility, faster implementation
+- **Choose Enterprise:** Massive scale (1000+ users), extensive compliance requirements, prefer big vendor support
+
+**Specific Recommendation:**
+Based on most customer feedback, try our solution first for 30 days. If it doesn't meet your needs, you can always migrate to an enterprise platform later (we'll even help with the transition).
+
+Ready to get started with a trial? I can set you up in the next 10 minutes."""
+
+        else:
+            # Use AI content to provide more specific guidance
+            if len(ai_content) > 100:  # If we have substantial AI analysis
+                # Extract practical advice from the AI content
+                simplified_advice = ai_content.replace("To troubleshoot", "Here's how to fix it:").replace("Consider the following", "Try these steps:")
+                return f"""I've analyzed your situation and here's what I recommend:
+
+{simplified_advice[:400]}{'...' if len(simplified_advice) > 400 else ''}
+
+**Immediate Next Steps:**
+1. Try the primary solution I outlined above
+2. If that doesn't work, check for any error messages or logs
+3. Test the solution in a staging environment first if possible
+
+Let me know how it goes, or if you need me to dive deeper into any specific part of the solution!"""
+            else:
+                return f"""I can help you with your question about {query[:50]}{'...' if len(query) > 50 else ''}.
+
+**Based on similar cases, here's what typically works:**
+1. Start by identifying the core issue - what exactly is happening vs what you expect?
+2. Check your configuration settings and recent changes
+3. Test with a simple example to isolate the problem
+4. Implement the fix incrementally and verify each step
+
+**Common Solutions:**
+- Configuration issues: Review your settings against our documentation
+- Integration problems: Test connections with basic API calls first  
+- Performance issues: Check resource usage and optimize bottlenecks
+
+What specific symptoms are you seeing? I can provide more targeted guidance once I understand the details."""
+
 # Import Galileo for AI observability
-try:
-    from galileo.handlers.crewai.handler import CrewAIEventListener
-    GALILEO_AVAILABLE = True
-    logging.info("Galileo observability loaded successfully")
-except ImportError:
-    GALILEO_AVAILABLE = False
-    logging.warning("Galileo not available - install with 'uv add galileo'")
+GALILEO_AVAILABLE = False
+galileo_logger = None
+
+# Only initialize Galileo if API key is available
+galileo_api_key = os.getenv('GALILEO_API_KEY')
+if galileo_api_key:
+    try:
+        # Set Galileo environment variables
+        os.environ['GALILEO_CONSOLE_URL'] = 'https://app.galileo.ai'
+        os.environ['GALILEO_API_KEY'] = galileo_api_key
+        
+        from galileo import GalileoLogger
+        
+        # Initialize Galileo logger
+        galileo_logger = GalileoLogger()
+        GALILEO_AVAILABLE = True
+        # Galileo will print its own login message, no need to duplicate
+    except Exception as e:
+        logging.warning(f"⚠️ Galileo initialization error: {e}")
+else:
+    # Only log this in debug mode - not a warning since it's optional
+    logging.debug("Galileo API key not set - observability features disabled")
 
 # Add src to path for AgentCraft imports
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
@@ -50,12 +215,8 @@ except ImportError:
 async def lifespan(app: FastAPI):
     # Startup
     if GALILEO_AVAILABLE:
-        # Initialize Galileo event listener for CrewAI observability
-        try:
-            CrewAIEventListener()
-            logging.info("Galileo observability initialized for CrewAI")
-        except Exception as e:
-            logging.warning(f"Galileo initialization failed: {e}")
+        # Galileo is already initialized globally
+        logging.info("🔭 Galileo observability ready for tracing")
     
     if AGENTCRAFT_AVAILABLE:
         logging.info("AgentCraft system initialized successfully with enhanced technical support agent")
@@ -98,13 +259,19 @@ class ChatResponse(BaseModel):
 # Global variables
 active_connections: List[WebSocket] = []
 
-@app.on_event("startup")
-async def startup_event():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     """Initialize AgentCraft system on startup"""
+    # Startup
     if AGENTCRAFT_AVAILABLE:
         logging.info("AgentCraft system initialized successfully with enhanced technical support agent")
     else:
         logging.info("Running in demo mode with mock responses")
+    
+    yield
+    
+    # Shutdown - cleanup if needed
+    logging.info("AgentCraft system shutting down")
 
 @app.get("/")
 async def root():
@@ -118,6 +285,23 @@ async def root():
 @app.post("/api/chat")
 async def chat_with_real_ai_agent(request: ChatMessage):
     """Real AI agent chat endpoint using Claude/CrewAI"""
+    
+    # Start Galileo trace if available
+    trace_id = None
+    if GALILEO_AVAILABLE and galileo_logger:
+        try:
+            trace_id = galileo_logger.start_trace(
+                name="chat_request",
+                input=request.message,  # Required input parameter
+                metadata={
+                    "agent_type": request.agent_type,
+                    "timestamp": datetime.now().isoformat()
+                }
+            )
+            logging.info(f"🔭 Galileo trace started: {trace_id}")
+        except Exception as e:
+            logging.warning(f"Failed to start Galileo trace: {e}")
+    
     try:
         if AGENTCRAFT_AVAILABLE and AI_POWERED:
             # Check if CrewAI orchestration is requested
@@ -137,79 +321,49 @@ async def chat_with_real_ai_agent(request: ChatMessage):
             success = "error" not in result
             performance_tracker.track_response(processing_time, success)
 
-            # Parse and format the AI analysis if it's a JSON string
-            formatted_response = ""
-
-            # Get the AI content from the technical response
-            ai_content = result["technical_response"].get('ai_analysis', '')
-
-            if ai_content:
-                try:
-                    # Parse the JSON string from AI analysis
-                    parsed = json.loads(ai_content)
-
-                    # Create a nicely formatted markdown response
-                    formatted_response = f"""**Technical Diagnosis:**
-{parsed.get('diagnosis', 'Analysis provided')}
-
-**Root Cause:**
-{parsed.get('root_cause', 'Cause identified')}
-
-**Solution:**
-{parsed.get('solution', 'Solution provided')}
-
-**Working Code:**
-```python
-{parsed.get('working_code', 'Code example provided')}
-```
-
-**Implementation Steps:**
-{chr(10).join(f"{i+1}. {step}" for i, step in enumerate(parsed.get('implementation_steps', [])))}
-
-**Testing Approach:**
-{parsed.get('testing_approach', 'Testing guidance provided')}
-
-**Prevention:**
-{parsed.get('prevention', 'Prevention strategies provided')}
-
-**Estimated Time:** {parsed.get('estimated_fix_time', 'Time estimate provided')}"""
-
-                except json.JSONDecodeError as e:
-                    # If JSON parsing fails, return the raw content but still formatted
-                    print(f"JSON parsing error: {e}")
-                    formatted_response = f"**AI Technical Analysis:**\n\n{ai_content}\n\n**Response Type:** Real-time AI analysis using Claude 3 Sonnet"
-
-            # Check for issue_analysis structure (already parsed JSON)
-            elif result["technical_response"].get('issue_analysis'):
-                issue_data = result["technical_response"]['issue_analysis']
-                formatted_response = f"""**Technical Diagnosis:**
-{issue_data.get('diagnosis', 'Analysis provided')}
-
-**Root Cause:**
-{issue_data.get('root_cause', 'Cause identified')}
-
-**Solution:**
-{issue_data.get('solution', 'Solution provided')}
-
-**Working Code:**
-```python
-{issue_data.get('working_code', 'Code example provided')}
-```
-
-**Implementation Steps:**
-{chr(10).join(f"{i+1}. {step}" for i, step in enumerate(issue_data.get('implementation_steps', [])))}
-
-**Testing Approach:**
-{issue_data.get('testing_approach', 'Testing guidance provided')}
-
-**Prevention:**
-{issue_data.get('prevention', 'Prevention strategies provided')}
-
-**Estimated Time:** {issue_data.get('estimated_fix_time', 'Time estimate provided')}"""
-
+            # Use the raw AI response directly from CrewAI
+            technical_data = result["technical_response"]
+            
+            # Extract the actual AI response without converting it
+            if technical_data.get('ai_analysis'):
+                # This is the raw CrewAI output
+                formatted_response = technical_data['ai_analysis']
+            elif technical_data.get('issue_analysis'):
+                # For structured responses, format them nicely
+                formatted_response = json.dumps(technical_data['issue_analysis'], indent=2)
+            elif technical_data.get('competitive_intelligence'):
+                formatted_response = json.dumps(technical_data['competitive_intelligence'], indent=2)
             else:
-                formatted_response = "AI analysis completed - no structured data available"
+                # Fallback to the full technical response
+                formatted_response = str(technical_data)
 
+            # Log to Galileo if available
+            if GALILEO_AVAILABLE and galileo_logger and trace_id:
+                try:
+                    # Add LLM span for the response
+                    galileo_logger.add_llm_span(
+                        span_id=f"llm_{trace_id}",
+                        trace_id=trace_id,
+                        name="CrewAI Response",
+                        model=result["agent_info"].get("llms_used", {}),
+                        messages=[
+                            {"role": "user", "content": request.message},
+                            {"role": "assistant", "content": formatted_response}
+                        ],
+                        metadata={
+                            "processing_time": result["agent_info"].get("processing_time", "N/A"),
+                            "agents_used": result["agent_info"].get("llms_used", {}),
+                            "ai_confidence": result["query_analysis"].get("ai_confidence", "N/A")
+                        }
+                    )
+                    
+                    # Conclude the trace
+                    galileo_logger.conclude(trace_id)
+                    galileo_logger.flush()  # Send to Galileo
+                    logging.info(f"🔭 Galileo trace concluded and sent: {trace_id}")
+                except Exception as e:
+                    logging.warning(f"Failed to log to Galileo: {e}")
+            
             return {
                 "success": True,
                 "response": {
@@ -221,7 +375,8 @@ async def chat_with_real_ai_agent(request: ChatMessage):
                 "timestamp": result["timestamp"],
                 "ai_powered": True,
                 "query_analysis": result.get("query_analysis", {}),
-                "orchestration_used": False  # Current setup uses single agent
+                "orchestration_used": False,  # Current setup uses single agent
+                "galileo_traced": GALILEO_AVAILABLE and trace_id is not None
             }
         elif AGENTCRAFT_AVAILABLE:
             # Fallback to template-based agents

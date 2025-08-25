@@ -192,6 +192,14 @@ class MultiAgentOrchestrator:
         self.webhook_tester = LiveWebhookTester()
         
         # Create specialized agents
+        # Get a default LLM for the orchestrator
+        from crewai import LLM
+        default_llm = LLM(
+            model="gpt-3.5-turbo",
+            temperature=0.1,
+            api_key=os.getenv('OPENAI_API_KEY')
+        ) if os.getenv('OPENAI_API_KEY') else None
+        
         self.orchestrator_agent = Agent(
             role='Senior Agent Orchestrator',
             goal='Analyze customer queries and route them to the most appropriate specialist agent',
@@ -199,6 +207,7 @@ class MultiAgentOrchestrator:
             customer queries and determines which specialist agent should handle the request.
             You have deep knowledge of all available specialists and their expertise areas.
             Your job is to ensure customers get routed to the right expert quickly.""",
+            llm=default_llm,
             verbose=True,
             allow_delegation=True
         )
@@ -212,6 +221,7 @@ class MultiAgentOrchestrator:
             - Rate limiting and performance optimization
             - Real-time technical problem diagnosis""",
             tools=[self.webhook_tool, self.webhook_tester],
+            llm=default_llm,
             verbose=True,
             allow_delegation=False
         )
@@ -225,6 +235,7 @@ class MultiAgentOrchestrator:
             - Technical competitive advantages
             - Strategic recommendations against competitors""",
             tools=[self.competitive_tool],
+            llm=default_llm,
             verbose=True,
             allow_delegation=False
         )
@@ -237,6 +248,7 @@ class MultiAgentOrchestrator:
             - Provides information about services and capabilities
             - Escalates technical issues to appropriate specialists
             - Maintains a helpful, professional tone""",
+            llm=default_llm,
             verbose=True,
             allow_delegation=True
         )

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Send, User, Bot, Brain, AlertTriangle, CheckCircle, 
   Clock, Activity, Terminal, Users, HandMetal, Eye,
-  ChevronRight, Loader2, Zap, Shield, Database,
+  ChevronRight, Loader2, Shield, Database,
   CreditCard, BarChart3, Target, ArrowRight, Copy, Check
 } from 'lucide-react';
 import axios from 'axios';
@@ -185,7 +185,6 @@ const MultiAgentDemo = () => {
   
   // UI state
   const [showDebugConsole, setShowDebugConsole] = useState(true);
-  const [useRealCrewAI, setUseRealCrewAI] = useState(false); // Toggle for real vs simulation
   const [conversationActive, setConversationActive] = useState(false);
   const [currentQueryAgents, setCurrentQueryAgents] = useState([]); // Agents used in current query
   
@@ -560,20 +559,19 @@ const MultiAgentDemo = () => {
       // Log query receipt
       addDebugLog('received', 'system', `Query received: "${userMessage.content}"`);
       
-      if (useRealCrewAI) {
-        // REAL CREWAI INTEGRATION
-        addDebugLog('routing', 'system', 'Using REAL CrewAI agents via backend API');
-        
-        try {
-          // Call the real backend API that uses CrewAI
-          const response = await axios.post('http://localhost:8000/api/chat', {
-            agent_type: 'multi-agent',
-            message: userMessage.content,
-            context: {
-              orchestration_mode: true,
-              debug_enabled: true
-            }
-          });
+      // ALWAYS USE REAL CREWAI - No more simulation
+      addDebugLog('routing', 'system', 'Processing with CrewAI agents via backend API');
+      
+      try {
+        // Call the real backend API that uses CrewAI
+        const response = await axios.post('http://localhost:8000/api/chat', {
+          agent_type: 'multi-agent',
+          message: userMessage.content,
+          context: {
+            orchestration_mode: true,
+            debug_enabled: true
+          }
+        });
           
           const result = response.data;
           
@@ -612,7 +610,9 @@ const MultiAgentDemo = () => {
               source: 'crewai_backend',
               ai_powered: result.ai_powered || false,
               processing_time: result.agent_info?.processing_time || 'N/A',
-              confidence: result.agent_info?.confidence || 0.9
+              confidence: result.query_analysis?.ai_confidence || 'High',
+              llms_used: result.agent_info?.llms_used || {},
+              real_crewai: true
             }
           };
           
@@ -631,15 +631,19 @@ const MultiAgentDemo = () => {
           console.error('Backend API error:', apiError);
           addDebugLog('error', 'backend', `API Error: ${apiError.message}`);
           
-          // Fallback to simulation if backend fails
-          addDebugLog('fallback', 'system', 'Falling back to simulation mode');
-          await runSimulation(userMessage);
+          // Show error message instead of simulation
+          setMessages(prev => [...prev, {
+            id: Date.now(),
+            type: 'assistant',
+            content: '⚠️ Backend service is not available. Please ensure the backend is running:\n\n```bash\nuv run python backend/main.py\n```\n\nThen try your message again.',
+            timestamp: new Date().toLocaleTimeString(),
+            metadata: {
+              source: 'system',
+              error: true
+            }
+          }]);
         }
         
-      } else {
-        // SIMULATION MODE
-        await runSimulation(userMessage);
-      }
       
     } catch (error) {
       console.error('Error processing message:', error);
@@ -710,7 +714,8 @@ const MultiAgentDemo = () => {
         source: 'simulation',
         agents_used: selectedAgents,
         confidence: 0.92,
-        processing_time: '3.2s'
+        processing_time: '3.2s',
+        real_crewai: false
       }
     };
     
@@ -835,7 +840,7 @@ const MultiAgentDemo = () => {
       conversationLength: messages.length,
       agentsUsed: currentQueryAgents,
       resolutionTime: 'N/A', // Could calculate from first to last message
-      crewaiMode: useRealCrewAI
+      crewaiMode: true // Always using CrewAI now
     };
 
     // Log to debug console for demo purposes
@@ -977,13 +982,20 @@ const MultiAgentDemo = () => {
                               {message.metadata?.source && (
                                 <>
                                   <span>•</span>
-                                  <span className="capitalize">{message.metadata.source.replace('_', ' ')}</span>
+                                  <span className={`capitalize ${message.metadata.real_crewai ? 'text-green-600 font-semibold' : ''}`}>
+                                    {message.metadata.real_crewai ? '🤖 ' : ''}
+                                    {message.metadata.source.replace('_', ' ')}
+                                  </span>
                                 </>
                               )}
                               {message.metadata?.confidence && (
                                 <>
                                   <span>•</span>
-                                  <span>{(message.metadata.confidence * 100).toFixed(0)}% confidence</span>
+                                  <span>
+                                    {typeof message.metadata.confidence === 'number' 
+                                      ? `${(message.metadata.confidence * 100).toFixed(0)}% confidence`
+                                      : message.metadata.confidence}
+                                  </span>
                                 </>
                               )}
                             </div>
@@ -1085,44 +1097,6 @@ const MultiAgentDemo = () => {
               </div>
             )}
 
-            {/* CrewAI Mode Toggle */}
-            <div className="bg-white rounded-lg shadow-sm border">
-              <div className="px-4 py-3 border-b">
-                <h3 className="font-semibold text-gray-900 flex items-center">
-                  <Zap className="w-5 h-5 mr-2 text-yellow-600" />
-                  CrewAI Mode
-                </h3>
-              </div>
-              <div className="p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm text-gray-700">Use Real CrewAI</span>
-                  <button
-                    onClick={() => setUseRealCrewAI(!useRealCrewAI)}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      useRealCrewAI ? 'bg-green-600' : 'bg-gray-300'
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        useRealCrewAI ? 'translate-x-6' : 'translate-x-1'
-                      }`}
-                    />
-                  </button>
-                </div>
-                <div className={`text-xs p-2 rounded ${
-                  useRealCrewAI ? 'bg-green-50 text-green-800' : 'bg-gray-50 text-gray-600'
-                }`}>
-                  <p className="font-medium mb-1">
-                    {useRealCrewAI ? '🟢 Real CrewAI Active' : '⚡ Simulation Mode'}
-                  </p>
-                  <p className="text-xs">
-                    {useRealCrewAI 
-                      ? 'Using backend API with real AI agents, Galileo tracking enabled'
-                      : 'Fast frontend simulation for demos'}
-                  </p>
-                </div>
-              </div>
-            </div>
 
             {/* Agent Library */}
             <div className="bg-white rounded-lg shadow-sm border">
@@ -1265,7 +1239,7 @@ const MultiAgentDemo = () => {
                         )}
                         {log.data.rating && (
                           <div>
-                            Rating: {log.data.rating}/5 stars • Agents: {log.data.agentsUsed?.length || 0} • Mode: {log.data.crewaiMode ? 'CrewAI' : 'Simulation'}
+                            Rating: {log.data.rating}/5 stars • Agents: {log.data.agentsUsed?.length || 0} • Mode: CrewAI
                           </div>
                         )}
                       </div>

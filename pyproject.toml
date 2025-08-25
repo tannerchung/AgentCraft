@@ -6,7 +6,7 @@ authors = ["Your Name <you@example.com>"]
 requires-python = ">=3.11"
 dependencies = [
     "anthropic>=0.64.0",
-    "crewai>=0.165.1",
+    "crewai[all]>=0.165.1",
     "fastapi>=0.104.0",
     "uvicorn>=0.24.0",
     "openai>=1.99.9",

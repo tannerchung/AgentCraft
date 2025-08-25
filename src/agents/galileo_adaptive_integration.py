@@ -13,13 +13,12 @@ import logging
 
 try:
     import galileo
-    from galileo.handlers.crewai.handler import CrewAIEventListener
-    from galileo.metrics import MetricsLogger
+    from galileo import GalileoLogger
     GALILEO_AVAILABLE = True
-    print("✅ Galileo observability loaded successfully")
+    # Don't print here - let the backend handle the message
 except ImportError:
     GALILEO_AVAILABLE = False
-    print("⚠️  Galileo not available - install with 'uv add galileo'")
+    # Silent failure - backend will handle Galileo initialization
 
 class GalileoAdaptiveIntegration:
     """Enhanced Galileo integration for the Adaptive Multi-LLM System"""
@@ -32,18 +31,21 @@ class GalileoAdaptiveIntegration:
             self.project_name = os.getenv('GALILEO_PROJECT', 'AgentCraft')
             self.log_stream = os.getenv('GALILEO_LOG_STREAM', 'adaptive-llm-system')
             
-            # Initialize CrewAI event listener (automatic capture)
-            self.event_listener = CrewAIEventListener()
-            
-            # Initialize metrics logger for custom metrics
-            self.metrics_logger = MetricsLogger(
-                project=self.project_name,
-                stream=self.log_stream
-            )
+            try:
+                # Initialize Galileo logger
+                self.logger = GalileoLogger()
+                self.metrics_logger = self.logger  # Use the same logger instance
+            except Exception as e:
+                logging.warning(f"Failed to initialize Galileo logger: {e}")
+                self.galileo_enabled = False
+                self.logger = None
+                self.metrics_logger = None
             
             logging.info(f"Galileo initialized: {self.project_name}/{self.log_stream}")
         else:
-            logging.warning("Galileo not available - metrics will use fallback tracking")
+            # Silent - backend handles Galileo status messages
+            self.logger = None
+            self.metrics_logger = None
     
     def log_llm_selection_event(self, query: str, selected_llms: Dict[str, str], 
                                complexity_score: float, context: Dict = None):
