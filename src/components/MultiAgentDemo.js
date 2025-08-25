@@ -35,7 +35,7 @@ const MessageContent = ({ content }) => {
 
   // Check if content looks like it has markdown formatting
   const hasMarkdown = /[*_#`[\]]/g.test(processedContent);
-  
+
   // If no markdown detected and has newlines, convert to basic markdown
   if (!hasMarkdown && processedContent.includes('\n')) {
     processedContent = processedContent
@@ -55,7 +55,7 @@ const MessageContent = ({ content }) => {
         code({ node, inline, className, children, ...props }) {
           const match = /language-(\w+)/.exec(className || '');
           const codeString = String(children).replace(/\n$/, '');
-          
+
           if (!inline && match) {
             const codeIndex = Math.random();
             return (
@@ -141,7 +141,7 @@ const MessageContent = ({ content }) => {
         // Custom horizontal rule
         hr: () => <hr className="my-4 border-gray-300" />,
         // Custom link styling
-        a: ({ href, children }) => (
+        a: ({href, children}) => (
           <a href={href} className="text-blue-600 hover:text-blue-800 underline" target="_blank" rel="noopener noreferrer">
             {children}
           </a>
@@ -172,22 +172,22 @@ const MultiAgentDemo = () => {
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-  
+
   // Debug console state
   const [debugLogs, setDebugLogs] = useState([]);
   const [activeAgents, setActiveAgents] = useState([]);
   const [agentAnalysis, setAgentAnalysis] = useState({});
-  
+
   // HITL state
   const [hitlRequest, setHitlRequest] = useState(null);
   const [hitlResponse, setHitlResponse] = useState('');
   const [showHitl, setShowHitl] = useState(false);
-  
+
   // UI state
   const [showDebugConsole, setShowDebugConsole] = useState(true);
   const [conversationActive, setConversationActive] = useState(false);
   const [currentQueryAgents, setCurrentQueryAgents] = useState([]); // Agents used in current query
-  
+
   // Feedback state
   const [showFeedback, setShowFeedback] = useState(false);
   const [feedbackRating, setFeedbackRating] = useState(0);
@@ -199,7 +199,7 @@ const MultiAgentDemo = () => {
   const [connectionStatus, setConnectionStatus] = useState('disconnected');
   const [realTimeSession, setRealTimeSession] = useState(null);
   const [liveAgentStates, setLiveAgentStates] = useState({});
-  
+
   const debugConsoleRef = useRef(null);
   const chatEndRef = useRef(null);
   const clientId = useRef(`client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
@@ -214,10 +214,10 @@ const MultiAgentDemo = () => {
     const fetchAgentLibrary = async () => {
       setAgentLibraryLoading(true);
       setAgentLibraryError(null);
-      
+
       try {
         const response = await axios.get('http://localhost:8000/api/agents/list');
-        
+
         if (response.data.success) {
           setAgentLibrary(response.data.agents);
           addDebugLog('system', 'info', `Loaded ${response.data.total_count} agents from database`);
@@ -232,7 +232,7 @@ const MultiAgentDemo = () => {
         setAgentLibraryLoading(false);
       }
     };
-    
+
     fetchAgentLibrary();
   }, []);
 
@@ -241,13 +241,13 @@ const MultiAgentDemo = () => {
     const connectWebSocket = () => {
       try {
         const ws = new WebSocket(`ws://localhost:8000/api/ws/agent-tracking/${clientId.current}`);
-        
+
         ws.onopen = () => {
           setConnectionStatus('connected');
           setWebsocket(ws);
           addDebugLog('websocket', 'system', 'Connected to real-time agent tracking');
         };
-        
+
         ws.onmessage = (event) => {
           try {
             const message = JSON.parse(event.data);
@@ -256,12 +256,12 @@ const MultiAgentDemo = () => {
             console.error('Error parsing WebSocket message:', err);
           }
         };
-        
+
         ws.onclose = () => {
           setConnectionStatus('disconnected');
           setWebsocket(null);
           addDebugLog('websocket', 'system', 'Disconnected from real-time tracking');
-          
+
           // Attempt to reconnect after 3 seconds
           setTimeout(() => {
             if (connectionStatus !== 'connected') {
@@ -269,13 +269,13 @@ const MultiAgentDemo = () => {
             }
           }, 3000);
         };
-        
+
         ws.onerror = (error) => {
           console.error('WebSocket error:', error);
           setConnectionStatus('error');
           addDebugLog('websocket', 'system', 'WebSocket connection error');
         };
-        
+
       } catch (err) {
         console.error('Failed to create WebSocket connection:', err);
         setConnectionStatus('error');
@@ -283,7 +283,7 @@ const MultiAgentDemo = () => {
     };
 
     connectWebSocket();
-    
+
     // Cleanup on unmount
     return () => {
       if (websocket) {
@@ -295,7 +295,7 @@ const MultiAgentDemo = () => {
   // Handle WebSocket messages for real-time updates
   const handleWebSocketMessage = (message) => {
     const { type, data, timestamp, session_id } = message;
-    
+
     switch (type) {
       case 'session_started':
         setRealTimeSession(session_id);
@@ -304,13 +304,13 @@ const MultiAgentDemo = () => {
         addDebugLog('crewai', 'realtime', `Session started: ${session_id}`);
         addDebugLog('crewai', 'realtime', `Agents: ${(data.agent_names || []).join(', ')}`);
         break;
-        
+
       case 'agent_status_update':
         if (data.session_id === realTimeSession || !realTimeSession) {
           const agentName = data.agent_name;
           const status = data.status;
           const progress = data.progress || 0;
-          
+
           setLiveAgentStates(prev => ({
             ...prev,
             [agentName]: {
@@ -321,7 +321,7 @@ const MultiAgentDemo = () => {
               updated_at: timestamp
             }
           }));
-          
+
           // Update active agents list
           if (status === 'ANALYZING' || status === 'PROCESSING' || status === 'COLLABORATING') {
             setActiveAgents(prev => {
@@ -333,30 +333,30 @@ const MultiAgentDemo = () => {
           } else if (status === 'FINISHED' || status === 'ERROR') {
             setActiveAgents(prev => prev.filter(name => name !== agentName));
           }
-          
+
           const statusText = status.toLowerCase().replace('_', ' ');
           addDebugLog('crewai', 'agent_update', 
             `${agentName}: ${statusText} (${progress}%) - ${data.details || data.current_task || ''}`
           );
         }
         break;
-        
+
       case 'crew_output':
         if (data.session_id === realTimeSession || !realTimeSession) {
           const outputType = data.output_type || 'general';
           const content = data.content || '';
           const agentName = data.agent_name || 'system';
-          
+
           addDebugLog('crewai', agentName, `[${outputType}] ${content}`);
         }
         break;
-        
+
       case 'phase_update':
         if (data.session_id === realTimeSession || !realTimeSession) {
           addDebugLog('crewai', 'orchestrator', `Phase: ${data.phase}`);
         }
         break;
-        
+
       case 'session_complete':
         if (data.session_id === realTimeSession || !realTimeSession) {
           setActiveAgents([]);
@@ -364,7 +364,7 @@ const MultiAgentDemo = () => {
           setRealTimeSession(null);
         }
         break;
-        
+
       case 'session_error':
         if (data.session_id === realTimeSession || !realTimeSession) {
           setActiveAgents([]);
@@ -372,26 +372,26 @@ const MultiAgentDemo = () => {
           setRealTimeSession(null);
         }
         break;
-        
+
       case 'crewai_log':
         // Handle CrewAI log streaming
         if (message.log) {
           const log = message.log;
           const logLevel = log.level || 'INFO';
           const logMessage = log.message || log.raw_message || '';
-          
+
           // Format log message for debug console
           let displayMessage = logMessage;
           if (log.agent_info && log.agent_info.agent_name) {
             displayMessage = `[${log.agent_info.agent_name}] ${logMessage}`;
           }
-          
+
           // Add to debug logs with appropriate level
           const debugLevel = logLevel.toLowerCase() === 'error' ? 'error' : 
                            logLevel.toLowerCase() === 'warning' ? 'warning' : 'info';
-          
+
           addDebugLog('crewai', debugLevel, displayMessage);
-          
+
           // If it's an agent-specific event, update live agent states
           if (log.event_type && log.agent_info && log.agent_info.agent_name) {
             const agentName = log.agent_info.agent_name;
@@ -407,22 +407,22 @@ const MultiAgentDemo = () => {
           }
         }
         break;
-        
+
       case 'log_streaming_started':
         addDebugLog('websocket', 'system', `CrewAI log streaming started for session: ${message.session_id}`);
         break;
-        
+
       case 'log_streaming_stopped':
         addDebugLog('websocket', 'system', 'CrewAI log streaming stopped');
         break;
-        
+
       case 'ping':
         // Send pong response to keep connection alive
         if (websocket && websocket.readyState === WebSocket.OPEN) {
           websocket.send(JSON.stringify({ type: 'pong' }));
         }
         break;
-        
+
       default:
         console.log('Unknown WebSocket message type:', type, message);
     }
@@ -456,40 +456,40 @@ const MultiAgentDemo = () => {
   const selectAgents = (query) => {
     const queryLower = query.toLowerCase();
     const selectedAgents = [];
-    
+
     // Always include orchestrator
     selectedAgents.push('orchestrator');
-    
+
     // Score each agent based on keyword matching
     Object.entries(agentLibrary).forEach(([agentId, agent]) => {
       if (agentId === 'orchestrator') return;
-      
+
       const score = agent.keywords.reduce((acc, keyword) => {
         return queryLower.includes(keyword) ? acc + 1 : acc;
       }, 0);
-      
+
       if (score > 0) {
         selectedAgents.push(agentId);
       }
     });
-    
+
     // If no specific agents selected, use technical as default
     if (selectedAgents.length === 1) {
       selectedAgents.push('technical');
     }
-    
+
     return selectedAgents;
   };
 
   // Simulate CrewAI agent processing
   const processWithAgent = async (agentId, query, context) => {
     const agent = agentLibrary[agentId];
-    
+
     addDebugLog('processing', agentId, `${agent.name} analyzing query...`);
-    
+
     // Simulate processing time
     await new Promise(resolve => setTimeout(resolve, 1500 + Math.random() * 1000));
-    
+
     // Generate agent-specific analysis
     const analysis = {
       agent: agent.name,
@@ -498,7 +498,7 @@ const MultiAgentDemo = () => {
       recommendations: [],
       requiresEscalation: false
     };
-    
+
     // Agent-specific analysis logic
     switch(agentId) {
       case 'technical':
@@ -513,7 +513,7 @@ const MultiAgentDemo = () => {
           "Implement retry logic with exponential backoff"
         ];
         break;
-      
+
       case 'billing':
         analysis.findings = [
           "Subscription proration calculation issue",
@@ -526,7 +526,7 @@ const MultiAgentDemo = () => {
           "Review subscription terms"
         ];
         break;
-      
+
       case 'security':
         analysis.findings = [
           "API key exposed in client-side code",
@@ -540,7 +540,7 @@ const MultiAgentDemo = () => {
         ];
         analysis.requiresEscalation = true;
         break;
-      
+
       case 'competitive':
         analysis.findings = [
           "Cost savings of 67% vs competitor platforms",
@@ -553,14 +553,14 @@ const MultiAgentDemo = () => {
           "Provide migration path documentation"
         ];
         break;
-      
+
       default:
         analysis.findings = ["Query analyzed successfully"];
         analysis.recommendations = ["No specific action required"];
     }
-    
+
     addDebugLog('analysis', agentId, `Analysis complete (confidence: ${(analysis.confidence * 100).toFixed(1)}%)`, analysis);
-    
+
     return analysis;
   };
 
@@ -573,19 +573,19 @@ const MultiAgentDemo = () => {
       timestamp: new Date().toLocaleTimeString(),
       agentRecommendation: "Human intervention recommended for optimal resolution"
     });
-    
+
     addDebugLog('escalation', 'system', `HITL escalation triggered: ${reason}`);
   };
 
   // Handle HITL response
   const submitHitlResponse = () => {
     if (!hitlResponse.trim()) return;
-    
+
     addDebugLog('hitl', 'human', `Human expert provided input: "${hitlResponse}"`);
-    
+
     // Add human response to context with formatted header
     const formattedResponse = `## 👨‍💼 Human Expert Response\n\n${hitlResponse}\n\n---\n*This response was provided by a human expert after HITL escalation.*`;
-    
+
     const humanMessage = {
       id: Date.now(),
       type: 'assistant',
@@ -596,12 +596,12 @@ const MultiAgentDemo = () => {
         escalation_resolved: true
       }
     };
-    
+
     setMessages(prev => [...prev, humanMessage]);
     setHitlResponse('');
     setShowHitl(false);
     setHitlRequest(null);
-    
+
     // Continue processing with human input
     setTimeout(() => {
       addDebugLog('system', 'orchestrator', 'Incorporating human expertise into response synthesis');
@@ -611,30 +611,30 @@ const MultiAgentDemo = () => {
   // Main message handler
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || isProcessing) return;
-    
+
     const userMessage = {
       id: Date.now(),
       type: 'user',
       content: inputMessage,
       timestamp: new Date().toLocaleTimeString()
     };
-    
+
     setMessages(prev => [...prev, userMessage]);
     setInputMessage('');
     setIsProcessing(true);
     setConversationActive(true);
-    
+
     // Clear previous analysis
     setAgentAnalysis({});
     setCurrentQueryAgents([]);
-    
+
     try {
       // Log query receipt
       addDebugLog('received', 'system', `Query received: "${userMessage.content}"`);
-      
+
       // ALWAYS USE REAL CREWAI - No more simulation
       addDebugLog('routing', 'system', 'Processing with CrewAI agents via backend API');
-      
+
       // Start log streaming for this session
       if (websocket && websocket.readyState === WebSocket.OPEN) {
         const sessionId = `chat_${Date.now()}`;
@@ -644,11 +644,11 @@ const MultiAgentDemo = () => {
         }));
         addDebugLog('websocket', 'system', `Started CrewAI log streaming for session: ${sessionId}`);
       }
-      
+
       try {
         // Generate session ID for tracking
         const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        
+
         // Call the real backend API that uses CrewAI
         const response = await axios.post('http://localhost:8000/api/chat', {
           agent_type: 'multi-agent',
@@ -660,22 +660,22 @@ const MultiAgentDemo = () => {
             websocket_client_id: clientId.current
           }
         });
-          
+
           const result = response.data;
-          
+
           // Log backend agent activity
           if (result.agent_info) {
             addDebugLog('backend', 'crewai', `Agent: ${result.agent_info.role || 'Technical Support'}`);
             addDebugLog('processing', 'crewai', `Processing time: ${result.agent_info.processing_time || 'N/A'}`);
           }
-          
+
           // Extract agent analysis from response
           if (result.query_analysis) {
             Object.entries(result.query_analysis).forEach(([key, value]) => {
               addDebugLog('analysis', 'crewai', `${key}: ${JSON.stringify(value)}`);
             });
           }
-          
+
           // Check if HITL escalation is needed
           if (result.escalation_required) {
             triggerHitlEscalation(
@@ -685,10 +685,10 @@ const MultiAgentDemo = () => {
             setIsProcessing(false);
             return;
           }
-          
+
           // Format the response content
           let responseContent = result.response?.content || result.response?.response || "Response received from CrewAI";
-          
+
           const assistantMessage = {
             id: Date.now() + 1,
             type: 'assistant',
@@ -700,25 +700,26 @@ const MultiAgentDemo = () => {
               processing_time: result.agent_info?.processing_time || 'N/A',
               confidence: result.query_analysis?.ai_confidence || 'High',
               llms_used: result.agent_info?.llms_used || {},
-              real_crewai: true
+              real_crewai: true,
+              agents_used: result.agent_info?.agents_used || [] // Add agents_used
             }
           };
-          
+
           setMessages(prev => [...prev, assistantMessage]);
-          
+
           addDebugLog('complete', 'crewai', 
             `Real CrewAI response delivered (${result.agent_info?.processing_time || 'N/A'})`
           );
-          
+
           // If Galileo is enabled, log that traces were sent
           if (result.galileo_logged) {
             addDebugLog('observability', 'galileo', 'Conversation traced to Galileo dashboard');
           }
-          
+
         } catch (apiError) {
           console.error('Backend API error:', apiError);
           addDebugLog('error', 'backend', `API Error: ${apiError.message}`);
-          
+
           // Show error message instead of simulation
           setMessages(prev => [...prev, {
             id: Date.now(),
@@ -731,12 +732,12 @@ const MultiAgentDemo = () => {
             }
           }]);
         }
-        
-      
+
+
     } catch (error) {
       console.error('Error processing message:', error);
       addDebugLog('error', 'system', `Error: ${error.message}`);
-      
+
       setMessages(prev => [...prev, {
         id: Date.now(),
         type: 'assistant',
@@ -757,25 +758,25 @@ const MultiAgentDemo = () => {
     const selectedAgents = selectAgents(userMessage.content);
     setActiveAgents(selectedAgents);
     setCurrentQueryAgents(selectedAgents);
-    
+
     addDebugLog('routing', 'orchestrator', 
       `Selected ${selectedAgents.length} agents: ${selectedAgents.map(id => agentLibrary[id].name).join(', ')}`
     );
-    
+
     // Step 2: Parallel Agent Processing (simulation)
     const agentPromises = selectedAgents.map(agentId => 
       processWithAgent(agentId, userMessage.content, {})
     );
-    
+
     const analyses = await Promise.all(agentPromises);
-    
+
     // Store analyses
     const analysisMap = {};
     selectedAgents.forEach((agentId, index) => {
       analysisMap[agentId] = analyses[index];
     });
     setAgentAnalysis(analysisMap);
-    
+
     // Check for escalation
     const needsEscalation = analyses.some(a => a.requiresEscalation);
     if (needsEscalation && Math.random() > 0.7) { // 30% chance for demo
@@ -786,14 +787,14 @@ const MultiAgentDemo = () => {
       setIsProcessing(false);
       return;
     }
-    
+
     // Step 3: Response Synthesis
     addDebugLog('synthesis', 'orchestrator', 'Synthesizing agent responses...');
     await new Promise(resolve => setTimeout(resolve, 1000));
-    
+
     // Generate final response
     const finalResponse = generateCustomerResponse(analysisMap);
-    
+
     const assistantMessage = {
       id: Date.now() + 1,
       type: 'assistant',
@@ -807,9 +808,9 @@ const MultiAgentDemo = () => {
         real_crewai: false
       }
     };
-    
+
     setMessages(prev => [...prev, assistantMessage]);
-    
+
     addDebugLog('complete', 'system', 
       `Simulated response delivered (${selectedAgents.length} agents, 3.2s total)`
     );
@@ -821,11 +822,11 @@ const MultiAgentDemo = () => {
     const customerAgents = Object.entries(analysisMap)
       .filter(([agentId, _]) => agentId !== 'orchestrator')
       .map(([_, analysis]) => analysis);
-    
+
     if (customerAgents.length === 0) {
       return "I've reviewed your request and I'm working to identify the best solution for you. Could you provide a few more details about what you're experiencing?";
     }
-    
+
     // Log technical details to debug console for support agents
     customerAgents.forEach((analysis, index) => {
       addDebugLog('technical', 'support_view', 
@@ -836,15 +837,15 @@ const MultiAgentDemo = () => {
         }
       );
     });
-    
+
     // Generate natural customer service response based on analysis
     const allFindings = [];
     customerAgents.forEach(analysis => {
       allFindings.push(...analysis.findings);
     });
-    
+
     let customerResponse = "";
-    
+
     // Detect the type of issue for personalized response
     const hasWebhookIssues = allFindings.some(f => 
       f.toLowerCase().includes('webhook') || f.toLowerCase().includes('403') || f.toLowerCase().includes('ssl')
@@ -855,7 +856,7 @@ const MultiAgentDemo = () => {
     const hasSecurityIssues = allFindings.some(f => 
       f.toLowerCase().includes('security') || f.toLowerCase().includes('api key') || f.toLowerCase().includes('vulnerability')
     );
-    
+
     if (hasWebhookIssues) {
       customerResponse = "I've identified some technical issues with your webhook integration that are causing the connectivity problems you're experiencing. ";
       customerResponse += "Our technical team is prepared to help you resolve these SSL certificate and authentication issues. ";
@@ -886,9 +887,9 @@ const MultiAgentDemo = () => {
       customerResponse += "• Coordinating with the relevant teams to ensure a smooth resolution\n";
       customerResponse += "• Following up to confirm everything is working as expected\n\n";
     }
-    
+
     customerResponse += "*Is there anything specific you'd like me to prioritize or any questions about these next steps?*";
-    
+
     return customerResponse;
   };
 
@@ -944,7 +945,7 @@ const MultiAgentDemo = () => {
     console.log('Customer Feedback:', feedbackData);
 
     setFeedbackSubmitted(true);
-    
+
     // Close feedback after brief delay
     setTimeout(() => {
       resetConversation();
@@ -997,7 +998,7 @@ const MultiAgentDemo = () => {
                   This is what the customer sees - clean, professional responses
                 </p>
               </div>
-              
+
               {/* Real-time Agent Activity Display */}
               {realTimeSession && Object.values(liveAgentStates).some(agent => agent && agent.status && agent.status !== 'idle') && (
                 <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4 mx-6 mb-4">
@@ -1013,7 +1014,7 @@ const MultiAgentDemo = () => {
                       {realTimeSession.overall_progress?.toFixed(1)}% complete
                     </div>
                   </div>
-                  
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {Object.values(liveAgentStates)
                       .filter(agent => agent && agent.status !== 'idle')
@@ -1031,15 +1032,15 @@ const MultiAgentDemo = () => {
                                     {agent.agent_name || 'Unknown Agent'}
                                   </h5>
                                   <div className={`ml-2 w-2 h-2 rounded-full flex-shrink-0 ${
-                                    agent.status === 'analyzing' ? 'bg-yellow-400 animate-pulse' :
-                                    agent.status === 'processing' ? 'bg-blue-500 animate-pulse' :
-                                    agent.status === 'collaborating' ? 'bg-purple-500 animate-pulse' :
-                                    agent.status === 'completing' ? 'bg-orange-500 animate-pulse' :
-                                    agent.status === 'finished' ? 'bg-green-500' :
-                                    agent.status === 'error' ? 'bg-red-500' : 'bg-gray-400'
+                                    agent.status === 'ANALYZING' ? 'bg-yellow-400 animate-pulse' :
+                                    agent.status === 'PROCESSING' ? 'bg-blue-500 animate-pulse' :
+                                    agent.status === 'COLLABORATING' ? 'bg-purple-500 animate-pulse' :
+                                    agent.status === 'COMPLETING' ? 'bg-orange-500 animate-pulse' :
+                                    agent.status === 'FINISHED' ? 'bg-green-500' :
+                                    agent.status === 'ERROR' ? 'bg-red-500' : 'bg-gray-400'
                                   }`}></div>
                                 </div>
-                                
+
                                 <div className="text-xs text-gray-600 mt-1 capitalize">
                                   {agent.status.replace('_', ' ')}
                                   {agent.current_task && (
@@ -1048,7 +1049,7 @@ const MultiAgentDemo = () => {
                                     </span>
                                   )}
                                 </div>
-                                
+
                                 {/* Progress bar */}
                                 {agent.progress > 0 && (
                                   <div className="mt-2">
@@ -1070,7 +1071,7 @@ const MultiAgentDemo = () => {
                         </div>
                       ))}
                   </div>
-                  
+
                   {/* Current Phase Indicator */}
                   {realTimeSession.current_phase && (
                     <div className="mt-3 pt-3 border-t border-blue-100">
@@ -1093,7 +1094,7 @@ const MultiAgentDemo = () => {
                   <div className="text-center text-gray-500 py-8">
                     <Bot className="w-12 h-12 mx-auto mb-3 text-gray-400" />
                     <p className="mb-4">Start a conversation to see multi-agent orchestration in action</p>
-                    
+
                     {/* Preset Query Buttons */}
                     <div className="space-y-2">
                       <p className="text-xs text-gray-600 mb-2">Quick test scenarios:</p>
@@ -1192,6 +1193,18 @@ const MultiAgentDemo = () => {
                                   </span>
                                 </>
                               )}
+                              {/* Show which agents were involved */}
+                              {message.metadata?.agents_used && message.metadata.agents_used.length > 0 && (
+                                <>
+                                  <span>•</span>
+                                  <span className="text-blue-600 font-medium">
+                                    {message.metadata.agents_used.map(agentId => {
+                                      const agent = agentLibrary[agentId];
+                                      return agent ? `${agent.avatar} ${agent.name}` : agentId;
+                                    }).join(', ')}
+                                  </span>
+                                </>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -1201,7 +1214,7 @@ const MultiAgentDemo = () => {
                 )}
                 <div ref={chatEndRef} />
               </div>
-              
+
               {/* Input */}
               <div className="border-t px-6 py-4">
                 <div className="flex space-x-2">
@@ -1258,12 +1271,12 @@ const MultiAgentDemo = () => {
                         <p className="font-medium text-gray-900">Escalation Reason:</p>
                         <p className="text-gray-700 mt-1">{hitlRequest.reason}</p>
                       </div>
-                      
+
                       <div className="text-sm">
                         <p className="font-medium text-gray-900">Agent Recommendation:</p>
                         <p className="text-gray-700 mt-1">{hitlRequest.agentRecommendation}</p>
                       </div>
-                      
+
                       <div>
                         <label className="block text-sm font-medium text-gray-900 mb-2">
                           Your Expert Input:
@@ -1276,7 +1289,7 @@ const MultiAgentDemo = () => {
                           rows={3}
                         />
                       </div>
-                      
+
                       <button
                         onClick={submitHitlResponse}
                         disabled={!hitlResponse.trim()}
@@ -1349,7 +1362,7 @@ const MultiAgentDemo = () => {
                       const hasAnalysisB = agentAnalysis[idB];
                       const hasLiveStateA = liveAgentStates[agentA.name] || liveAgentStates[idA];
                       const hasLiveStateB = liveAgentStates[agentB.name] || liveAgentStates[idB];
-                      
+
                       // Sort by: currently active > completed analysis > has live state > inactive
                       if (activeAgents.includes(idA) && !activeAgents.includes(idB)) return -1;
                       if (activeAgents.includes(idB) && !activeAgents.includes(idA)) return 1;
@@ -1368,7 +1381,7 @@ const MultiAgentDemo = () => {
                       const liveState = liveAgentStates[agent.name] || liveAgentStates[id];
                       const isLiveActive = liveState && ['ANALYZING', 'PROCESSING', 'COLLABORATING'].includes(liveState.status);
                       const isLiveFinished = liveState && liveState.status === 'FINISHED';
-                      
+
                       return (
                         <div 
                           key={id} 
@@ -1408,7 +1421,7 @@ const MultiAgentDemo = () => {
                               )}
                             </div>
                             <p className="text-xs text-gray-500">{agent.role}</p>
-                            
+
                             {/* Show live state info */}
                             {liveState && (
                               <div className="text-xs mt-1">
@@ -1417,7 +1430,7 @@ const MultiAgentDemo = () => {
                                   isLiveFinished ? 'text-green-600' : 
                                   'text-gray-600'
                                 }`}>
-                                  {liveState.status.toLowerCase().replace('_', ' ')} ({liveState.progress}%)
+                                  {liveState.status.replace('_', ' ').toLowerCase()} ({liveState.progress}%)
                                 </div>
                                 {liveState.current_task && (
                                   <div className="text-gray-500 truncate" title={liveState.current_task}>
@@ -1426,7 +1439,7 @@ const MultiAgentDemo = () => {
                                 )}
                               </div>
                             )}
-                            
+
                             {/* Fallback to simulation analysis if no live state */}
                             {!liveState && hasAnalysis && !isCurrentlyActive && (
                               <p className="text-xs text-green-600 mt-1">
@@ -1458,7 +1471,7 @@ const MultiAgentDemo = () => {
               <Eye className="w-5 h-5" />
             </button>
           </div>
-          
+
           {showDebugConsole && (
             <div 
               ref={debugConsoleRef}
@@ -1606,7 +1619,7 @@ const MultiAgentDemo = () => {
             )}
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 };
