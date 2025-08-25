@@ -19,24 +19,6 @@ deploymentTarget = "cloudrun"
 runButton = "Start React Development"
 
 [[workflows.workflow]]
-name = "Run AgentCraft Demo"
-author = 44826427
-mode = "sequential"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "streamlit run src/demo/streamlit_dashboard.py --server.port 5000 --server.address 0.0.0.0"
-
-[[workflows.workflow]]
-name = "Run AgentCraft Demo"
-author = 44826427
-mode = "sequential"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "streamlit run src/demo/streamlit_dashboard.py --server.port 5000 --server.address 0.0.0.0"
-
-[[workflows.workflow]]
 name = "Start React Development"
 author = 44826427
 mode = "sequential"
@@ -53,6 +35,15 @@ mode = "sequential"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "cd backend && python main.py"
+
+[[workflows.workflow]]
+name = "Frontend Server Only"
+mode = "sequential"
+author = 44826427
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm start"
 
 [[ports]]
 localPort = 3000
