@@ -500,6 +500,58 @@ async def process_direct_ai_chat(request: ChatMessage):
             }
         }
         
+        # Search knowledge base for relevant information to provide URL citations
+        knowledge_sources = []
+        try:
+            import httpx
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                kb_response = await client.post(
+                    "http://localhost:8000/api/knowledge/knowledge-base/search",
+                    headers={"Content-Type": "application/json"},
+                    json={
+                        "query": request.message,
+                        "company": "zapier",  # Default to current company
+                        "limit": 3
+                    }
+                )
+                
+                if kb_response.status_code == 200:
+                    kb_data = kb_response.json()
+                    if kb_data.get("success") and kb_data.get("results"):
+                        for result in kb_data["results"]:
+                            # Only include results with real URLs (not placeholder IDs)
+                            if result.get("url") and result.get("url") != result.get("id") and result.get("url").startswith("http"):
+                                knowledge_sources.append({
+                                    "title": result.get("title", ""),
+                                    "url": result.get("url", ""),
+                                    "relevance": result.get("similarity_score", 0.0),
+                                    "category": result.get("category", "")
+                                })
+                        debug_info["knowledge_base_search"] = {
+                            "attempted": True,
+                            "status": "success", 
+                            "sources_found": len(knowledge_sources),
+                            "query": request.message
+                        }
+                    else:
+                        debug_info["knowledge_base_search"] = {
+                            "attempted": True,
+                            "status": "no_results",
+                            "query": request.message
+                        }
+                else:
+                    debug_info["knowledge_base_search"] = {
+                        "attempted": True,
+                        "status": "error",
+                        "status_code": kb_response.status_code
+                    }
+        except Exception as kb_error:
+            debug_info["knowledge_base_search"] = {
+                "attempted": True,
+                "status": "failed",
+                "error": str(kb_error)
+            }
+        
         # Determine the best agent type based on the query
         query_lower = request.message.lower()
         
@@ -736,7 +788,17 @@ CURRENT QUESTION: {request.message}
                                     # Prepare the content to be sent to Claude
                                     content_for_claude = content[:3000]
                                     
-                                    # Build the full prompt for transparency
+                                    # Build the full prompt for transparency with dynamic citations
+                                    if knowledge_sources:
+                                        citations = []
+                                        for src in knowledge_sources[:2]:  # Limit to top 2 sources
+                                            citations.append(f"**{src['title']}** ({src['url']})")
+                                        citation_instruction = f"""---
+**Sources:** Information retrieved from: {', '.join(citations)}"""
+                                    else:
+                                        citation_instruction = """---
+**Source:** Information based on general AI knowledge and Zapier's official documentation (https://zapier.com/help/create/webhooks)"""
+                                    
                                     full_prompt = f"""As a {agent_type}, please answer the user's question with full awareness of our ongoing conversation.
 
 {context_prompt}
@@ -750,10 +812,9 @@ Please provide a comprehensive, helpful answer that:
 3. Maintains continuity with the ongoing discussion
 4. IMPORTANT: Include proper citations by ending your response with:
 
----
-**Source:** Information retrieved from Zapier's official webhook documentation (https://zapier.com/help/create/webhooks)
+{citation_instruction}
 
-Use this format to cite the source and maintain transparency about where the information comes from."""
+Use this format to cite sources and maintain transparency about where the information comes from."""
 
                                     # Add detailed prompt analysis to debug info
                                     debug_info["service_details"]["firecrawl"]["prompt_integration"] = {

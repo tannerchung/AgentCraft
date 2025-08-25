@@ -6,6 +6,7 @@ Handles knowledge base indexing and semantic search
 import os
 import json
 import numpy as np
+import uuid
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 import hashlib
@@ -57,18 +58,32 @@ class QdrantService:
         collection_name: str = "agentcraft_knowledge",
         host: str = "localhost",
         port: int = 6333,
-        use_memory: bool = True  # Use in-memory for demo
+        use_memory: bool = False  # Use persistent storage by default
     ):
         self.collection_name = collection_name
         self.embedding_dim = 384  # MiniLM dimension
         
         if QDRANT_AVAILABLE:
-            if use_memory:
-                # Use in-memory Qdrant for demo (no server needed)
+            # Try Qdrant Cloud first (persistent), then local, then memory
+            import os
+            qdrant_url = os.getenv('QDRANT_URL')
+            qdrant_api_key = os.getenv('QDRANT_API_KEY')
+            
+            if qdrant_url and qdrant_api_key and not use_memory:
+                # Use Qdrant Cloud for persistence
+                self.client = QdrantClient(
+                    url=qdrant_url,
+                    api_key=qdrant_api_key,
+                )
+                print(f"Connected to Qdrant Cloud: {qdrant_url}")
+            elif use_memory:
+                # Use in-memory Qdrant for testing (no server needed)
                 self.client = QdrantClient(":memory:")
+                print("Using Qdrant in-memory mode (data will not persist)")
             else:
-                # Connect to Qdrant server
+                # Connect to local Qdrant server
                 self.client = QdrantClient(host=host, port=port)
+                print(f"Connected to local Qdrant server: {host}:{port}")
             
             self._initialize_collection()
         else:
@@ -392,7 +407,7 @@ class QdrantService:
             
             # Create point with metadata
             point = PointStruct(
-                id=hashlib.md5(article.id.encode()).hexdigest()[:8],
+                id=str(uuid.uuid4()),
                 vector=embedding,
                 payload={
                     "id": article.id,
@@ -401,7 +416,8 @@ class QdrantService:
                     "category": article.category,
                     "tags": article.tags,
                     "created_at": article.created_at,
-                    "updated_at": article.updated_at
+                    "updated_at": article.updated_at,
+                    "metadata": article.metadata if article.metadata else {}
                 }
             )
             points.append(point)
@@ -496,5 +512,5 @@ class QdrantService:
                 "message": str(e)
             }
 
-# Singleton instance
-qdrant_service = QdrantService(use_memory=True)
+# Singleton instance - uses persistent Qdrant Cloud storage
+qdrant_service = QdrantService(use_memory=False)

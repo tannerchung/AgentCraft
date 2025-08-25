@@ -14,6 +14,124 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+class KnowledgeManager:
+    """Manages companies and their knowledge base configurations"""
+    
+    def __init__(self, db_manager: DatabaseManager):
+        self.db = db_manager
+    
+    async def get_all_companies(self) -> List[Dict]:
+        """Get all companies"""
+        async with self.db.pool.acquire() as conn:
+            rows = await conn.fetch("""
+                SELECT id, name, domain, description, is_active, created_at, updated_at
+                FROM companies 
+                WHERE is_active = true
+                ORDER BY name
+            """)
+            return [dict(row) for row in rows]
+    
+    async def get_company_by_name(self, name: str) -> Optional[Dict]:
+        """Get company by name"""
+        async with self.db.pool.acquire() as conn:
+            row = await conn.fetchrow("""
+                SELECT id, name, domain, description, is_active, created_at, updated_at
+                FROM companies 
+                WHERE LOWER(name) = LOWER($1)
+            """, name)
+            return dict(row) if row else None
+    
+    async def create_company(self, company_data: Dict) -> UUID:
+        """Create a new company"""
+        company_id = uuid4()
+        async with self.db.pool.acquire() as conn:
+            await conn.execute("""
+                INSERT INTO companies (id, name, domain, description)
+                VALUES ($1, $2, $3, $4)
+            """, 
+                company_id,
+                company_data['name'],
+                company_data.get('domain', ''),
+                company_data.get('description', '')
+            )
+        logger.info(f"Created company: {company_data['name']} ({company_id})")
+        return company_id
+    
+    async def get_company_crawl_urls(self, company_name: str) -> List[str]:
+        """Get all crawl URLs for a company"""
+        async with self.db.pool.acquire() as conn:
+            rows = await conn.fetch("""
+                SELECT cu.url
+                FROM crawl_urls cu
+                JOIN companies c ON cu.company_id = c.id
+                WHERE LOWER(c.name) = LOWER($1) AND cu.is_active = true
+                ORDER BY cu.created_at
+            """, company_name)
+            return [row['url'] for row in rows]
+    
+    async def add_crawl_url(self, company_name: str, url: str) -> UUID:
+        """Add a crawl URL for a company"""
+        url_id = uuid4()
+        
+        # Get or create company
+        company = await self.get_company_by_name(company_name)
+        if not company:
+            company_id = await self.create_company({
+                'name': company_name,
+                'domain': url.split('/')[2] if '://' in url else '',
+                'description': f"Auto-created for {company_name}"
+            })
+        else:
+            company_id = company['id']
+        
+        async with self.db.pool.acquire() as conn:
+            await conn.execute("""
+                INSERT INTO crawl_urls (id, company_id, url)
+                VALUES ($1, $2, $3)
+                ON CONFLICT (company_id, url) DO NOTHING
+            """, url_id, company_id, url)
+        
+        logger.info(f"Added crawl URL for {company_name}: {url}")
+        return url_id
+    
+    async def remove_crawl_url(self, company_name: str, url: str) -> bool:
+        """Remove a crawl URL for a company"""
+        async with self.db.pool.acquire() as conn:
+            result = await conn.execute("""
+                UPDATE crawl_urls cu
+                SET is_active = false, updated_at = CURRENT_TIMESTAMP
+                FROM companies c
+                WHERE cu.company_id = c.id 
+                AND LOWER(c.name) = LOWER($1) 
+                AND cu.url = $2
+            """, company_name, url)
+            success = result.split()[-1] == '1'
+            if success:
+                logger.info(f"Removed crawl URL for {company_name}: {url}")
+            return success
+    
+    async def get_current_company(self) -> str:
+        """Get the current active company from settings"""
+        async with self.db.pool.acquire() as conn:
+            row = await conn.fetchrow("""
+                SELECT setting_value
+                FROM system_settings
+                WHERE setting_key = 'current_company'
+            """)
+            return row['setting_value'] if row else 'zapier'
+    
+    async def set_current_company(self, company_name: str) -> bool:
+        """Set the current active company"""
+        async with self.db.pool.acquire() as conn:
+            await conn.execute("""
+                INSERT INTO system_settings (setting_key, setting_value)
+                VALUES ('current_company', $1)
+                ON CONFLICT (setting_key) 
+                DO UPDATE SET setting_value = $1, updated_at = CURRENT_TIMESTAMP
+            """, company_name)
+        logger.info(f"Set current company to: {company_name}")
+        return True
+
 class DatabaseManager:
     """Manages PostgreSQL database connections and operations"""
     
@@ -364,3 +482,4 @@ class LearningManager:
 db_manager = DatabaseManager()
 agent_manager = AgentManager(db_manager)
 learning_manager = LearningManager(db_manager)
+knowledge_manager = KnowledgeManager(db_manager)

@@ -1,21 +1,19 @@
 import React, { useState } from 'react';
 import RealPerformanceAnalytics from './components/RealPerformanceAnalytics';
 import ABTestingDashboard from './components/ABTestingDashboard';
-import AgentChat from './components/AgentChat';
 import MultiAgentDemo from './components/MultiAgentDemo';
 import AgentConfiguration from './components/AgentConfiguration';
 import KnowledgeBaseManager from './components/KnowledgeBaseManager';
-import { Activity, MessageSquare, Users, BarChart3, Zap, Settings, Database } from 'lucide-react';
+import { MessageSquare, BarChart3, Zap, Settings, Database } from 'lucide-react';
 
 function App() {
   const [activeTab, setActiveTab] = useState('performance');
 
   const tabs = [
     { id: 'performance', name: 'Performance Analytics', icon: BarChart3 },
-    { id: 'multi-agent', name: 'Multi-Agent Demo', icon: Users },
+    { id: 'multi-agent', name: 'Agent Chat', icon: MessageSquare },
     { id: 'knowledge', name: 'Knowledge Base', icon: Database },
     { id: 'config', name: 'Agent Configuration', icon: Settings },
-    { id: 'chat', name: 'Agent Chat', icon: MessageSquare },
     { id: 'ab-testing', name: 'A/B Testing', icon: Zap },
   ];
 
@@ -29,8 +27,6 @@ function App() {
         return <KnowledgeBaseManager />;
       case 'config':
         return <AgentConfiguration />;
-      case 'chat':
-        return <AgentChat />;
       case 'ab-testing':
         return <ABTestingDashboard />;
       default:

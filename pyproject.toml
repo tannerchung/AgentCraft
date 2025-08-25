@@ -20,4 +20,8 @@ dependencies = [
     "langchain-openai>=0.3.31",
     "pytest>=8.4.1",
     "pytest-asyncio>=1.1.0",
+    "numpy>=2.3.2",
+    "qdrant-client>=1.15.1",
+    "sentence-transformers>=5.1.0",
+    "firecrawl-py>=3.3.2",
 ]

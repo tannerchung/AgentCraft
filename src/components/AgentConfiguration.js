@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { 
   Settings, Search, Edit3, Copy, Trash2, Plus, Save, X, 
   Eye, Code, TestTube, BarChart3, ArrowRight, AlertCircle,
-  CheckCircle, Info, Download, Upload, RefreshCw
+  CheckCircle, Info, Download, Upload, RefreshCw, Database
 } from 'lucide-react';
 import QueryAnalyzer from './QueryAnalyzer';
+import axios from 'axios';
 
 // Agent Creation Form Component
-const CreateAgentForm = ({ onCancel, onSave }) => {
+const CreateAgentForm = ({ onCancel, onSave, companyContext, targetCompany }) => {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -131,6 +132,45 @@ const CreateAgentForm = ({ onCancel, onSave }) => {
 
   return (
     <form onSubmit={handleSubmit} className="p-6 space-y-6">
+      {/* Company Context */}
+      {companyContext && (
+        <div className="bg-blue-50 p-4 rounded-lg">
+          <h4 className="text-sm font-medium text-blue-900 flex items-center mb-2">
+            <Database className="w-4 h-4 mr-2" />
+            Recommended for {companyContext.description}
+          </h4>
+          <p className="text-xs text-blue-700 mb-3">
+            Consider creating agents in these areas for optimal {targetCompany} support:
+          </p>
+          <div className="grid gap-2">
+            {companyContext.recommendedForNew?.map(agent => (
+              <div key={agent.name} className="bg-blue-100 p-2 rounded">
+                <div className="flex items-center space-x-2 mb-1">
+                  <span className="text-lg">{agent.avatar}</span>
+                  <span className="text-sm font-medium text-blue-900">{agent.name}</span>
+                </div>
+                <p className="text-xs text-blue-700">{agent.role}</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFormData({
+                      ...formData,
+                      name: agent.name,
+                      description: agent.role,
+                      category: agent.category,
+                      avatar: agent.avatar
+                    });
+                  }}
+                  className="mt-1 text-xs bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700"
+                >
+                  Use Template
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Basic Information */}
       <div className="space-y-4">
         <h4 className="text-lg font-medium text-gray-900 flex items-center">
@@ -393,9 +433,65 @@ const AgentConfiguration = () => {
   const [agents, setAgents] = useState([]);
   const [agentsLoading, setAgentsLoading] = useState(true);
   const [agentsError, setAgentsError] = useState(null);
+
+  // Knowledge Base integration
+  const [targetCompany, setTargetCompany] = useState('zapier');
+  const [availableCompanies, setAvailableCompanies] = useState({
+    zapier: { name: 'Zapier', emoji: '⚡', color: 'orange' },
+    hubspot: { name: 'HubSpot', emoji: '🧲', color: 'orange' },
+    shopify: { name: 'Shopify', emoji: '🛍️', color: 'green' }
+  });
   
-  // Load agents from database API with real metrics
+  // Company-specific agent recommendations (using actual agent names from database)
+  const [companyAgentMapping] = useState({
+    zapier: {
+      primary: ['Technical Integration Specialist', 'DevOps Engineer', 'Competitive Intelligence Analyst'],
+      secondary: ['Billing & Revenue Expert', 'Security Specialist'],
+      description: 'Automation Platform Integration',
+      recommendedForNew: [
+        { name: 'Zapier Workflow Expert', role: 'Zapier automation specialist', avatar: '⚡', category: 'Technical' },
+        { name: 'Integration Troubleshooter', role: 'API integration debugging', avatar: '🔗', category: 'Technical' }
+      ]
+    },
+    hubspot: {
+      primary: ['Competitive Intelligence Analyst', 'Billing & Revenue Expert'],
+      secondary: ['Technical Integration Specialist', 'Security Specialist'],
+      description: 'CRM & Marketing Platform',
+      recommendedForNew: [
+        { name: 'HubSpot CRM Expert', role: 'HubSpot CRM specialist', avatar: '🧲', category: 'Business' },
+        { name: 'Marketing Automation Specialist', role: 'Marketing campaigns and automation', avatar: '📢', category: 'Business' },
+        { name: 'Sales Pipeline Analyst', role: 'Sales analytics and optimization', avatar: '📈', category: 'Analysis' }
+      ]
+    },
+    shopify: {
+      primary: ['Billing & Revenue Expert', 'Technical Integration Specialist'],
+      secondary: ['Security Specialist', 'Competitive Intelligence Analyst'],
+      description: 'E-commerce Platform',
+      recommendedForNew: [
+        { name: 'Shopify Store Expert', role: 'Shopify store optimization', avatar: '🛍️', category: 'Business' },
+        { name: 'Payment Processing Specialist', role: 'Payment gateway and processing', avatar: '💸', category: 'Business' },
+        { name: 'E-commerce Support Agent', role: 'Customer support for online stores', avatar: '🎧', category: 'Customer' }
+      ]
+    }
+  });
+  
+  // Sync with Knowledge Base and load agents from database API
   useEffect(() => {
+    const syncWithKnowledgeBase = async () => {
+      try {
+        // Sync with Knowledge Base to get current target company
+        const knowledgeResponse = await axios.get('http://localhost:8000/api/knowledge/companies');
+        
+        if (knowledgeResponse.data.success) {
+          setAvailableCompanies(knowledgeResponse.data.companies);
+          setTargetCompany(knowledgeResponse.data.current_company);
+        }
+      } catch (error) {
+        console.error('Error syncing with Knowledge Base:', error);
+        // Continue with default configuration
+      }
+    };
+
     const fetchAgents = async () => {
       setAgentsLoading(true);
       setAgentsError(null);
@@ -491,10 +587,47 @@ const AgentConfiguration = () => {
       }
     };
     
+    syncWithKnowledgeBase();
     fetchAgents();
   }, []);
-  
-  // Hardcoded agents removed - now loaded from database
+
+  // Get agent priority for company context (using actual agent names)
+  const getAgentPriority = (agentName) => {
+    const companyMapping = companyAgentMapping[targetCompany];
+    if (!companyMapping) return 'other';
+    
+    if (companyMapping.primary.includes(agentName)) return 'primary';
+    if (companyMapping.secondary.includes(agentName)) return 'secondary';
+    return 'other';
+  };
+
+  // Get missing company-specific agents that should be created
+  const getMissingAgents = () => {
+    const companyMapping = companyAgentMapping[targetCompany];
+    if (!companyMapping || !companyMapping.recommendedForNew) return [];
+    
+    const existingAgentNames = agents.map(agent => agent.name);
+    return companyMapping.recommendedForNew.filter(
+      recommendedAgent => !existingAgentNames.includes(recommendedAgent.name)
+    );
+  };
+
+  // Handle company change and sync with Knowledge Base
+  const handleCompanyChange = async (newCompanyId) => {
+    setTargetCompany(newCompanyId);
+    
+    try {
+      const response = await axios.post('http://localhost:8000/api/knowledge/switch-company', {
+        company: newCompanyId
+      });
+      
+      if (response.data.success) {
+        console.log(`Switched Knowledge Base to ${availableCompanies[newCompanyId]?.name || newCompanyId}`);
+      }
+    } catch (error) {
+      console.error('Error syncing company change with Knowledge Base:', error);
+    }
+  };
 
   const filteredAgents = agents.filter(agent => {
     const matchesSearch = searchTerm === '' || 
@@ -505,6 +638,18 @@ const AgentConfiguration = () => {
     const matchesCategory = selectedCategory === 'All' || agent.category === selectedCategory;
     
     return matchesSearch && matchesCategory;
+  }).sort((a, b) => {
+    // Sort by company priority: primary > secondary > other
+    const priorityA = getAgentPriority(a.name);
+    const priorityB = getAgentPriority(b.name);
+    const priorityOrder = { 'primary': 0, 'secondary': 1, 'other': 2 };
+    
+    if (priorityOrder[priorityA] !== priorityOrder[priorityB]) {
+      return priorityOrder[priorityA] - priorityOrder[priorityB];
+    }
+    
+    // Then sort alphabetically
+    return a.name.localeCompare(b.name);
   });
 
   const categories = ['All', ...new Set(agents.map(agent => agent.category))];
@@ -568,6 +713,35 @@ const AgentConfiguration = () => {
         <p className="text-gray-600 mt-2">
           Configure, customize, and optimize your AI agent library
         </p>
+        
+        {/* Knowledge Base Integration */}
+        <div className="mt-4 flex items-center justify-between bg-blue-50 p-4 rounded-lg">
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+              <Database className="w-5 h-5 text-blue-600" />
+              <span className="text-sm font-medium text-blue-800">Knowledge Base Context</span>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <label className="text-sm text-gray-700">Target Company:</label>
+              <select
+                value={targetCompany}
+                onChange={(e) => handleCompanyChange(e.target.value)}
+                className="border border-gray-300 rounded px-3 py-1 text-sm focus:ring-2 focus:ring-blue-500"
+              >
+                {Object.entries(availableCompanies).map(([id, company]) => (
+                  <option key={id} value={id}>
+                    {company.emoji} {company.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          
+          <div className="text-xs text-blue-600">
+            {companyAgentMapping[targetCompany]?.description || 'Platform Context'}
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -576,7 +750,12 @@ const AgentConfiguration = () => {
           <div className="bg-white rounded-lg shadow-sm border">
             <div className="px-6 py-4 border-b">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-gray-900">Agent Library</h2>
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900">Agent Library</h2>
+                  <div className="text-xs text-gray-600 mt-1">
+                    Optimized for {companyAgentMapping[targetCompany]?.description || availableCompanies[targetCompany]?.name}
+                  </div>
+                </div>
                 <button
                   onClick={() => setShowCreateModal(true)}
                   className="bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700 text-sm flex items-center"
@@ -585,6 +764,70 @@ const AgentConfiguration = () => {
                   New Agent
                 </button>
               </div>
+              
+              {/* Missing Company Agents Alert */}
+              {getMissingAgents().length > 0 && (
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 mb-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-sm font-medium text-orange-800 flex items-center">
+                      <AlertCircle className="w-4 h-4 mr-2" />
+                      Missing {availableCompanies[targetCompany]?.name} Specialists
+                    </h4>
+                    <span className="text-xs text-orange-600">{getMissingAgents().length} recommended</span>
+                  </div>
+                  <div className="grid gap-1">
+                    {getMissingAgents().slice(0, 2).map(agent => (
+                      <div key={agent.name} className="flex items-center justify-between text-xs">
+                        <div className="flex items-center">
+                          <span className="mr-2">{agent.avatar}</span>
+                          <span className="text-orange-700 font-medium">{agent.name}</span>
+                        </div>
+                        <button
+                          onClick={() => {
+                            setEditForm({
+                              name: agent.name,
+                              description: agent.role,
+                              category: agent.category,
+                              avatar: agent.avatar,
+                              keywords: '',
+                              confidenceThreshold: 0.7,
+                              maxResponseLength: 2000,
+                              promptTemplate: 'You are a specialized AI agent. Provide helpful, accurate, and detailed responses within your domain of expertise.',
+                              escalationRules: ['low_confidence', 'domain_mismatch'],
+                              responseFormat: 'structured',
+                              domain: '',
+                              backstory: '',
+                              goal: ''
+                            });
+                            setShowCreateModal(true);
+                          }}
+                          className="bg-orange-600 text-white px-2 py-1 rounded text-xs hover:bg-orange-700"
+                        >
+                          Create
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Priority Legend */}
+              {companyAgentMapping[targetCompany] && (
+                <div className="flex items-center text-xs space-x-3 mb-4 pt-2 border-t border-gray-100">
+                  <div className="flex items-center">
+                    <div className="w-2 h-2 bg-green-500 rounded-full mr-1"></div>
+                    <span className="text-gray-600">Primary ({companyAgentMapping[targetCompany].primary.length})</span>
+                  </div>
+                  <div className="flex items-center">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full mr-1"></div>
+                    <span className="text-gray-600">Secondary ({companyAgentMapping[targetCompany].secondary.length})</span>
+                  </div>
+                  <div className="flex items-center">
+                    <div className="w-2 h-2 bg-gray-400 rounded-full mr-1"></div>
+                    <span className="text-gray-600">Available</span>
+                  </div>
+                </div>
+              )}
               
               {/* Search and Filter */}
               <div className="space-y-3">
@@ -636,19 +879,50 @@ const AgentConfiguration = () => {
                   <p className="text-sm text-gray-500">No agents match your search criteria</p>
                 </div>
               ) : (
-                filteredAgents.map((agent) => (
+                filteredAgents.map((agent) => {
+                  const priority = getAgentPriority(agent.name);
+                  return (
                 <div
                   key={agent.id}
-                  className={`p-4 cursor-pointer hover:bg-gray-50 transition-colors ${
-                    selectedAgent?.id === agent.id ? 'bg-blue-50 border-r-2 border-r-blue-500' : ''
+                  className={`p-4 cursor-pointer transition-colors ${
+                    selectedAgent?.id === agent.id 
+                      ? 'bg-blue-50 border-r-2 border-r-blue-500' 
+                      : priority === 'primary' 
+                        ? 'hover:bg-green-50 border-l-2 border-l-green-300' 
+                        : priority === 'secondary' 
+                          ? 'hover:bg-blue-50 border-l-2 border-l-blue-300' 
+                          : 'hover:bg-gray-50'
                   }`}
                   onClick={() => setSelectedAgent(agent)}
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex items-start">
-                      <span className="text-2xl mr-3">{agent.avatar}</span>
+                      <div className="relative">
+                        <span className="text-2xl mr-3">{agent.avatar}</span>
+                        {/* Priority indicator */}
+                        {priority !== 'other' && (
+                          <div className={`absolute -bottom-1 -right-1 w-2 h-2 rounded-full ${
+                            priority === 'primary' ? 'bg-green-500' : 'bg-blue-500'
+                          }`}></div>
+                        )}
+                      </div>
                       <div>
-                        <h3 className="font-medium text-gray-900">{agent.name}</h3>
+                        <div className="flex items-center space-x-2">
+                          <h3 className={`font-medium ${
+                            priority === 'primary' ? 'text-green-800' :
+                            priority === 'secondary' ? 'text-blue-800' : 'text-gray-900'
+                          }`}>{agent.name}</h3>
+                          {priority === 'primary' && (
+                            <span className="text-xs px-1.5 py-0.5 bg-green-100 text-green-700 rounded">
+                              Primary
+                            </span>
+                          )}
+                          {priority === 'secondary' && (
+                            <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">
+                              Secondary
+                            </span>
+                          )}
+                        </div>
                         <p className="text-sm text-gray-600 mt-1">{agent.category}</p>
                         <div className="flex items-center mt-2 space-x-4 text-xs text-gray-500">
                           <span className="flex items-center">
@@ -679,7 +953,8 @@ const AgentConfiguration = () => {
                     </div>
                   </div>
                 </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>
@@ -1022,6 +1297,8 @@ const AgentConfiguration = () => {
                 setAgents(prev => [...prev, newAgent]);
                 setShowCreateModal(false);
               }}
+              companyContext={companyAgentMapping[targetCompany]}
+              targetCompany={targetCompany}
             />
           </div>
         </div>

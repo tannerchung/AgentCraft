@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Send, User, Bot, Brain, AlertTriangle, CheckCircle, 
   Clock, Activity, Terminal, Users, HandMetal, Eye,
-  ChevronRight, Loader2, Shield, Database,
+  ChevronRight, Loader2, Shield, Database, MessageSquare, MessageCircle,
   CreditCard, BarChart3, Target, ArrowRight, Copy, Check
 } from 'lucide-react';
 import axios from 'axios';
@@ -180,18 +180,53 @@ const MultiAgentDemo = () => {
   const [inputMessage, setInputMessage] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Target Company Selection State
+  // Target Company Selection State - now synced with Knowledge Base
   const [targetCompany, setTargetCompany] = useState('zapier');
   const [availableCompanies, setAvailableCompanies] = useState({
     zapier: { name: 'Zapier', emoji: '⚡', color: 'orange' },
     hubspot: { name: 'HubSpot', emoji: '🧲', color: 'orange' },
     shopify: { name: 'Shopify', emoji: '🛍️', color: 'green' }
   });
+  
+  // Company-specific agent recommendations (using actual agent names from database)
+  const [companyAgentMapping] = useState({
+    zapier: {
+      primary: ['Technical Integration Specialist', 'DevOps Engineer', 'Competitive Intelligence Analyst'],
+      secondary: ['Billing & Revenue Expert', 'Security Specialist'],
+      description: 'Automation Platform Integration',
+      // Company-specific agents that should be created
+      suggested: [
+        { name: 'Zapier Workflow Expert', role: 'Zapier automation specialist', avatar: '⚡', keywords: ['zapier', 'automation', 'workflow', 'zap', 'trigger', 'action'] },
+        { name: 'Integration Troubleshooter', role: 'API integration debugging', avatar: '🔗', keywords: ['integration', 'api', 'connector', 'webhook'] }
+      ]
+    },
+    hubspot: {
+      primary: ['Competitive Intelligence Analyst', 'Billing & Revenue Expert'],
+      secondary: ['Technical Integration Specialist', 'Security Specialist'],
+      description: 'CRM & Marketing Platform',
+      suggested: [
+        { name: 'HubSpot CRM Expert', role: 'HubSpot CRM specialist', avatar: '🧲', keywords: ['hubspot', 'crm', 'contacts', 'deals', 'pipeline'] },
+        { name: 'Marketing Automation Specialist', role: 'Marketing campaigns and automation', avatar: '📢', keywords: ['marketing', 'campaigns', 'email', 'automation', 'leads'] },
+        { name: 'Sales Pipeline Analyst', role: 'Sales analytics and optimization', avatar: '📈', keywords: ['sales', 'pipeline', 'analytics', 'conversion', 'forecasting'] }
+      ]
+    },
+    shopify: {
+      primary: ['Billing & Revenue Expert', 'Technical Integration Specialist'],
+      secondary: ['Security Specialist', 'Competitive Intelligence Analyst'],
+      description: 'E-commerce Platform',
+      suggested: [
+        { name: 'Shopify Store Expert', role: 'Shopify store optimization', avatar: '🛍️', keywords: ['shopify', 'ecommerce', 'store', 'products', 'orders'] },
+        { name: 'Payment Processing Specialist', role: 'Payment gateway and processing', avatar: '💸', keywords: ['payments', 'gateway', 'transactions', 'pci', 'stripe'] },
+        { name: 'E-commerce Support Agent', role: 'Customer support for online stores', avatar: '🎧', keywords: ['support', 'customers', 'orders', 'refunds', 'shipping'] }
+      ]
+    }
+  });
 
   // Debug console state
   const [debugLogs, setDebugLogs] = useState([]);
   const [activeAgents, setActiveAgents] = useState([]);
   const [agentAnalysis, setAgentAnalysis] = useState({});
+  const debugLogIdCounter = useRef(0);
 
   // HITL state
   const [hitlRequest, setHitlRequest] = useState(null);
@@ -202,6 +237,29 @@ const MultiAgentDemo = () => {
   const [showDebugConsole, setShowDebugConsole] = useState(true);
   const [conversationActive, setConversationActive] = useState(false);
   const [currentQueryAgents, setCurrentQueryAgents] = useState([]); // Agents used in current query
+  
+  // Single Agent Mode state
+  const [singleAgentMode, setSingleAgentMode] = useState(false);
+  const [selectedAgent, setSelectedAgent] = useState('technical');
+  
+  // Agent definitions (from AgentChat component)
+  const availableAgents = [
+    { id: 'technical', name: 'Technical Integration Specialist', avatar: '🔧', category: 'Technical' },
+    { id: 'devops', name: 'DevOps Engineer', avatar: '⚙️', category: 'Technical' },
+    { id: 'security', name: 'Security Specialist', avatar: '🛡️', category: 'Technical' },
+    { id: 'database', name: 'Database Expert', avatar: '🗄️', category: 'Technical' },
+    { id: 'billing', name: 'Billing & Revenue Expert', avatar: '💳', category: 'Business' },
+    { id: 'legal', name: 'Legal Compliance Agent', avatar: '⚖️', category: 'Business' },
+    { id: 'sales', name: 'Sales Operations Specialist', avatar: '📈', category: 'Business' },
+    { id: 'marketing', name: 'Marketing Automation Expert', avatar: '📢', category: 'Business' },
+    { id: 'competitive', name: 'Competitive Intelligence Analyst', avatar: '📊', category: 'Analysis' },
+    { id: 'data', name: 'Data Analytics Specialist', avatar: '📈', category: 'Analysis' },
+    { id: 'finance', name: 'Financial Analyst', avatar: '💰', category: 'Analysis' },
+    { id: 'support', name: 'Customer Success Manager', avatar: '🤝', category: 'Customer' },
+    { id: 'education', name: 'Training & Education Specialist', avatar: '🎓', category: 'Customer' },
+    { id: 'product', name: 'Product Manager', avatar: '🚀', category: 'Product' },
+    { id: 'ux', name: 'UX Research Specialist', avatar: '🎨', category: 'Product' }
+  ];
 
   // Feedback state
   const [showFeedback, setShowFeedback] = useState(false);
@@ -224,8 +282,46 @@ const MultiAgentDemo = () => {
   const [agentLibraryLoading, setAgentLibraryLoading] = useState(true);
   const [agentLibraryError, setAgentLibraryError] = useState(null);
 
-  // Load agent library from database API
+  // Sync with Knowledge Base and load agent library
   useEffect(() => {
+    const syncWithKnowledgeBase = async () => {
+      try {
+        // First, sync with Knowledge Base to get current target company
+        const knowledgeResponse = await axios.get('http://localhost:8000/api/knowledge/companies');
+        
+        if (knowledgeResponse.data.success) {
+          // Ensure we have valid company data before updating state
+          if (knowledgeResponse.data.companies && knowledgeResponse.data.companies.length > 0) {
+            // Transform backend array format to frontend object format
+            const companiesObject = {};
+            knowledgeResponse.data.companies.forEach(company => {
+              companiesObject[company.id] = {
+                name: company.name,
+                emoji: company.id === 'zapier' ? '⚡' : company.id === 'hubspot' ? '🧲' : '🛍️',
+                color: company.id === 'shopify' ? 'green' : 'orange',
+                domain: company.domain,
+                status: company.status
+              };
+            });
+            console.log('🔄 Backend returned:', knowledgeResponse.data.companies);
+            console.log('🔄 Transformed companies:', companiesObject);
+            console.log('🔄 Current availableCompanies before update:', availableCompanies);
+            setAvailableCompanies(companiesObject);
+            console.log('🔄 availableCompanies should now be:', companiesObject);
+          }
+          if (knowledgeResponse.data.current_company) {
+            setTargetCompany(knowledgeResponse.data.current_company);
+          }
+          addDebugLog('knowledge', 'sync', `Synced with Knowledge Base - Target: ${knowledgeResponse.data.current_company || 'default'}`);
+        } else {
+          addDebugLog('knowledge', 'warning', `Knowledge Base API returned success=false`);
+        }
+      } catch (error) {
+        console.error('Error syncing with Knowledge Base:', error);
+        addDebugLog('knowledge', 'warning', `Using default company configuration - ${error.message}`);
+      }
+    };
+
     const fetchAgentLibrary = async () => {
       setAgentLibraryLoading(true);
       setAgentLibraryError(null);
@@ -248,6 +344,7 @@ const MultiAgentDemo = () => {
       }
     };
 
+    syncWithKnowledgeBase();
     fetchAgentLibrary();
   }, []);
 
@@ -454,17 +551,92 @@ const MultiAgentDemo = () => {
     }
   }, [debugLogs]);
 
+  // Force re-render when target company changes
+  useEffect(() => {
+    console.log(`🎯 Target company changed to: ${targetCompany}`);
+    // Force agent library to re-evaluate priorities
+    if (Object.keys(agentLibrary).length > 0) {
+      setAgentLibrary(prev => ({...prev}));
+    }
+  }, [targetCompany]);
+
   // Add debug log
   const addDebugLog = (type, agent, message, data = null) => {
     const timestamp = new Date().toLocaleTimeString();
+    debugLogIdCounter.current += 1;
     setDebugLogs(prev => [...prev, {
       timestamp,
       type,
       agent,
       message,
       data,
-      id: Date.now()
+      id: debugLogIdCounter.current
     }]);
+  };
+
+  // Get filtered agents based on target company
+  const getFilteredAgents = () => {
+    const companyMapping = companyAgentMapping[targetCompany];
+    if (!companyMapping || !agentLibrary || Object.keys(agentLibrary).length === 0) {
+      return Object.entries(agentLibrary);
+    }
+
+    // Prioritize agents: primary agents first, then secondary, then others (using agent names)
+    const allAgentEntries = Object.entries(agentLibrary);
+    const primaryAgents = allAgentEntries.filter(([id, agent]) => companyMapping.primary.includes(agent.name));
+    const secondaryAgents = allAgentEntries.filter(([id, agent]) => companyMapping.secondary.includes(agent.name));
+    const otherAgents = allAgentEntries.filter(([id, agent]) => 
+      !companyMapping.primary.includes(agent.name) && !companyMapping.secondary.includes(agent.name)
+    );
+
+    return [...primaryAgents, ...secondaryAgents, ...otherAgents];
+  };
+
+  // Get agent priority for styling (using actual agent names)
+  const getAgentPriority = (agentName) => {
+    const companyMapping = companyAgentMapping[targetCompany];
+    if (!companyMapping) {
+      console.log(`No company mapping found for ${targetCompany}`);
+      return 'other';
+    }
+    
+    console.log(`Checking priority for agent "${agentName}" in company "${targetCompany}"`, {
+      primary: companyMapping.primary,
+      secondary: companyMapping.secondary,
+      isPrimary: companyMapping.primary.includes(agentName),
+      isSecondary: companyMapping.secondary.includes(agentName)
+    });
+    
+    if (companyMapping.primary.includes(agentName)) return 'primary';
+    if (companyMapping.secondary.includes(agentName)) return 'secondary';
+    return 'other';
+  };
+
+  // Handle company change and sync with Knowledge Base
+  const handleCompanyChange = async (newCompanyId) => {
+    console.log(`🏢 Switching company from "${targetCompany}" to "${newCompanyId}"`);
+    console.log(`🎯 Company mappings available:`, Object.keys(companyAgentMapping));
+    
+    // Update target company
+    setTargetCompany(newCompanyId);
+    
+    // Force agent library to re-render with new priorities by triggering a state update
+    setAgentLibrary(prev => ({...prev}));
+    
+    // Sync with Knowledge Base
+    try {
+      const response = await axios.post('http://localhost:8000/api/knowledge/switch-company', {
+        company: newCompanyId
+      });
+      
+      if (response.data.success) {
+        addDebugLog('knowledge', 'sync', `Switched Knowledge Base to ${availableCompanies[newCompanyId]?.name || newCompanyId}`);
+        addDebugLog('agents', 'filter', `Updated agent library for ${companyAgentMapping[newCompanyId]?.description || 'target company'}`);
+      }
+    } catch (error) {
+      console.error('Error syncing company change with Knowledge Base:', error);
+      addDebugLog('knowledge', 'warning', `Failed to sync company change: ${error.message}`);
+    }
   };
 
   // Simulate agent selection based on query
@@ -664,18 +836,32 @@ const MultiAgentDemo = () => {
         // Generate session ID for tracking
         const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-        // Make API call to backend with company context
-        const response = await fetch('http://localhost:8000/api/chat', {
+        // Choose API endpoint based on mode
+        const apiEndpoint = singleAgentMode ? 'http://localhost:8000/api/direct-chat' : 'http://localhost:8000/api/chat';
+        const requestBody = singleAgentMode ? {
+          message: userMessage.content,
+          agent_type: selectedAgent,
+          session_id: sessionId
+        } : {
+          message: userMessage.content,
+          agent_type: 'orchestrator',
+          target_company: targetCompany,
+          company_context: availableCompanies[targetCompany]
+        };
+
+        addDebugLog('api', 'system', `Using ${singleAgentMode ? 'single agent' : 'multi-agent'} mode via ${apiEndpoint}`);
+        if (singleAgentMode) {
+          const selectedAgentInfo = availableAgents.find(a => a.id === selectedAgent);
+          addDebugLog('agent', 'selected', `Direct chat with: ${selectedAgentInfo?.avatar} ${selectedAgentInfo?.name}`);
+        }
+
+        // Make API call to backend
+        const response = await fetch(apiEndpoint, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            message: userMessage.content,
-            agent_type: 'orchestrator',
-            target_company: targetCompany,
-            company_context: availableCompanies[targetCompany]
-          })
+          body: JSON.stringify(requestBody)
         });
 
           if (!response.ok) {
@@ -717,21 +903,25 @@ const MultiAgentDemo = () => {
             content: responseContent,
             timestamp: new Date().toLocaleTimeString(),
             metadata: {
-              source: 'crewai_backend',
+              source: singleAgentMode ? 'direct_agent' : 'crewai_backend',
               ai_powered: result.ai_powered || false,
               processing_time: result.agent_info?.processing_time || 'N/A',
               confidence: result.query_analysis?.ai_confidence || 'High',
               llms_used: result.agent_info?.llms_used || {},
-              real_crewai: true,
-              agents_used: result.agent_info?.agents_used || [] // Add agents_used
+              real_crewai: !singleAgentMode,
+              direct_agent: singleAgentMode,
+              selected_agent: singleAgentMode ? selectedAgent : null,
+              agents_used: result.agent_info?.agents_used || []
             }
           };
 
           setMessages(prev => [...prev, assistantMessage]);
 
-          addDebugLog('complete', 'crewai', 
-            `Real CrewAI response delivered (${result.agent_info?.processing_time || 'N/A'})`
-          );
+          const completionMessage = singleAgentMode 
+            ? `Direct ${selectedAgent} agent response delivered (${result.agent_info?.processing_time || 'N/A'})`
+            : `Real CrewAI response delivered (${result.agent_info?.processing_time || 'N/A'})`;
+          
+          addDebugLog('complete', singleAgentMode ? selectedAgent : 'crewai', completionMessage);
 
           // If Galileo is enabled, log that traces were sent
           if (result.galileo_logged) {
@@ -924,13 +1114,13 @@ const MultiAgentDemo = () => {
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
+        {/* Simplified Header */}
         <div className="mb-6">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold text-gray-900 flex items-center">
-                <Users className="w-8 h-8 mr-3 text-blue-600" />
-                Multi-Agent Orchestration Demo
+                <MessageSquare className="w-8 h-8 mr-3 text-blue-600" />
+                Agent Chat
                 <div className={`ml-4 flex items-center text-sm px-3 py-1 rounded-full ${
                   connectionStatus === 'connected' ? 'bg-green-100 text-green-700' :
                   connectionStatus === 'error' ? 'bg-red-100 text-red-700' :
@@ -941,48 +1131,98 @@ const MultiAgentDemo = () => {
                     connectionStatus === 'error' ? 'bg-red-500' :
                     'bg-yellow-500'
                   }`}></div>
-                  Real-time {connectionStatus}
+                  {connectionStatus}
                 </div>
               </h1>
               <p className="text-gray-600 mt-2">
-                Experience CrewAI-powered agent coordination with live WebSocket updates, debug transparency and HITL capabilities
+                Smart AI assistance with specialized agents and real-time collaboration
               </p>
             </div>
-
-            {/* Target Company Selection */}
+          </div>
+        </div>
+        
+        {/* Context Bar */}
+        <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-3">
+          <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <label className="text-sm font-medium text-gray-700">Target Company:</label>
-              <select
-                value={targetCompany}
-                onChange={(e) => setTargetCompany(e.target.value)}
-                className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                {Object.entries(availableCompanies).map(([id, company]) => (
-                  <option key={id} value={id}>
-                    {company.emoji} {company.name}
-                  </option>
-                ))}
-              </select>
-              <div className="text-xs text-gray-500">
-                Context: {availableCompanies[targetCompany].name} Integration Platform
+              <div className="flex items-center space-x-2">
+                <Database className="w-4 h-4 text-blue-600" />
+                <span className="text-sm font-medium text-blue-800">Knowledge Base:</span>
+                <select
+                  value={targetCompany}
+                  onChange={(e) => handleCompanyChange(e.target.value)}
+                  className="border border-blue-300 bg-white rounded px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500"
+                >
+                  {Object.entries(availableCompanies).map(([id, company]) => {
+                    console.log('🎯 Dropdown option:', { id, company });
+                    return (
+                      <option key={id} value={id}>
+                        {company.emoji} {company.name}
+                      </option>
+                    );
+                  })}
+                </select>
               </div>
+            </div>
+            <div className="text-xs text-blue-600">
+              {companyAgentMapping[targetCompany]?.description || 
+               (availableCompanies[targetCompany]?.name ? 
+                 `${availableCompanies[targetCompany].name} Platform` : 
+                 `${targetCompany.charAt(0).toUpperCase() + targetCompany.slice(1)} Platform`)}
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main Chat Interface (Customer View) */}
-          <div className="lg:col-span-2">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* Main Chat Interface */}
+          <div className="lg:col-span-3">
             {/* Chat Window */}
             <div className="bg-white rounded-lg shadow-sm border">
               <div className="border-b px-6 py-4">
-                <h3 className="font-semibold text-gray-900 flex items-center">
-                  <User className="w-5 h-5 mr-2 text-blue-600" />
-                  Customer Chat Interface
-                </h3>
-                <p className="text-sm text-gray-600 mt-1">
-                  This is what the customer sees - clean, professional responses
-                </p>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-semibold text-gray-900 flex items-center">
+                      <MessageCircle className="w-5 h-5 mr-2 text-blue-600" />
+                      {singleAgentMode ? 'Direct Agent Chat' : 'Multi-Agent Chat'}
+                    </h3>
+                    <p className="text-sm text-gray-600 mt-1">
+                      {singleAgentMode ? 'One-on-one with specialized agent' : 'AI team collaboration'}
+                    </p>
+                  </div>
+                  
+                  {/* Inline Mode Toggle */}
+                  <div className="flex items-center space-x-3">
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="singleAgentMode"
+                        checked={singleAgentMode}
+                        onChange={(e) => setSingleAgentMode(e.target.checked)}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <label htmlFor="singleAgentMode" className="text-sm font-medium text-gray-700">
+                        Single Agent
+                      </label>
+                    </div>
+                    
+                    {singleAgentMode && (
+                      <select
+                        value={selectedAgent}
+                        onChange={(e) => setSelectedAgent(e.target.value)}
+                        className="border border-gray-300 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500"
+                      >
+                        {getFilteredAgents().slice(0, 8).map(([id, agent]) => {
+                          const priority = getAgentPriority(agent.name);
+                          return (
+                            <option key={id} value={id}>
+                              {agent.avatar} {agent.name.split(' ')[0]} {priority === 'primary' ? '⭐' : ''}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    )}
+                  </div>
+                </div>
               </div>
 
               {/* Real-time Agent Activity Display */}
@@ -1004,8 +1244,8 @@ const MultiAgentDemo = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {Object.values(liveAgentStates)
                       .filter(agent => agent && agent.status !== 'idle')
-                      .map(agent => (
-                        <div key={agent.agent_id} className="bg-white rounded-lg p-3 border border-blue-100">
+                      .map((agent, index) => (
+                        <div key={`live-${agent.agent_id}-${index}`} className="bg-white rounded-lg p-3 border border-blue-100">
                           <div className="flex items-start justify-between">
                             <div className="flex items-start min-w-0 flex-1">
                               {/* Agent Avatar from database */}
@@ -1083,7 +1323,9 @@ const MultiAgentDemo = () => {
 
                     {/* Preset Query Buttons */}
                     <div className="space-y-2">
-                      <p className="text-xs text-gray-600 mb-2">Quick test scenarios:</p>
+                      <p className="text-xs text-gray-600 mb-2">
+                        Quick test scenarios ({singleAgentMode ? 'Single Agent' : 'Multi-Agent'} mode):
+                      </p>
                       <div className="flex flex-wrap gap-2 justify-center">
                         <button
                           onClick={() => {
@@ -1129,8 +1371,8 @@ const MultiAgentDemo = () => {
                     </div>
                   </div>
                 ) : (
-                  messages.map(message => (
-                    <div key={message.id} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  messages.map((message, index) => (
+                    <div key={`msg-${message.id}-${index}`} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
                       <div className={`max-w-2xl ${message.type === 'user' ? 'order-2' : ''}`}>
                         <div className="flex items-start space-x-2">
                           <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
@@ -1163,9 +1405,11 @@ const MultiAgentDemo = () => {
                               {message.metadata?.source && (
                                 <>
                                   <span>•</span>
-                                  <span className={`capitalize ${message.metadata.real_crewai ? 'text-green-600 font-semibold' : ''}`}>
-                                    {message.metadata.real_crewai ? '🤖 ' : ''}
-                                    {message.metadata.source.replace('_', ' ')}
+                                  <span className={`capitalize ${message.metadata.real_crewai ? 'text-green-600 font-semibold' : message.metadata.direct_agent ? 'text-blue-600 font-semibold' : ''}`}>
+                                    {message.metadata.real_crewai ? '🤖 ' : message.metadata.direct_agent ? '🎯 ' : ''}
+                                    {message.metadata.direct_agent && message.metadata.selected_agent 
+                                      ? `${availableAgents.find(a => a.id === message.metadata.selected_agent)?.avatar || ''} Direct Agent`
+                                      : message.metadata.source.replace('_', ' ')}
                                   </span>
                                 </>
                               )}
@@ -1291,11 +1535,18 @@ const MultiAgentDemo = () => {
             )}
 
 
-            {/* Agent Library */}
+            {/* Agent Library - Company-Specific */}
             <div className="bg-white rounded-lg shadow-sm border">
               <div className="px-4 py-3 border-b">
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-semibold text-gray-900">Agent Library</h3>
+                  <div>
+                    <h3 className="font-semibold text-gray-900">Agent Library</h3>
+                    <div className="text-xs text-gray-600 mt-1">
+                      Optimized for {companyAgentMapping[targetCompany]?.description || 
+                                   availableCompanies[targetCompany]?.name || 
+                                   'Platform Context'}
+                    </div>
+                  </div>
                   {agentLibraryLoading ? (
                     <div className="flex items-center text-xs text-blue-600">
                       <Loader2 className="w-3 h-3 mr-1 animate-spin" />
@@ -1304,7 +1555,14 @@ const MultiAgentDemo = () => {
                   ) : agentLibraryError ? (
                     <span className="text-xs text-red-600">Error loading</span>
                   ) : (
-                    <span className="text-xs text-gray-500">{Object.keys(agentLibrary).length} agents</span>
+                    <div key={targetCompany} className="text-right">
+                      <span className="text-xs text-gray-500">{Object.keys(agentLibrary).length} total agents</span>
+                      {companyAgentMapping[targetCompany] && (
+                        <div className="text-xs text-green-600">
+                          {companyAgentMapping[targetCompany].primary.length} primary • {companyAgentMapping[targetCompany].secondary.length} secondary
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
                 {currentQueryAgents.length > 0 && (
@@ -1314,8 +1572,26 @@ const MultiAgentDemo = () => {
                     <span className="ml-1">{currentQueryAgents.length} agents active</span>
                   </div>
                 )}
+                
+                {/* Agent Priority Legend */}
+                {companyAgentMapping[targetCompany] && (
+                  <div className="flex items-center text-xs space-x-3 mt-2 pt-2 border-t border-gray-100">
+                    <div className="flex items-center">
+                      <div className="w-2 h-2 bg-green-500 rounded-full mr-1"></div>
+                      <span className="text-gray-600">Primary</span>
+                    </div>
+                    <div className="flex items-center">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full mr-1"></div>
+                      <span className="text-gray-600">Secondary</span>
+                    </div>
+                    <div className="flex items-center">
+                      <div className="w-2 h-2 bg-gray-400 rounded-full mr-1"></div>
+                      <span className="text-gray-600">Available</span>
+                    </div>
+                  </div>
+                )}
               </div>
-              <div className="p-4 space-y-2 max-h-80 overflow-y-auto">
+              <div key={targetCompany} className="p-4 space-y-2 max-h-80 overflow-y-auto">
                 {agentLibraryLoading ? (
                   <div className="text-center py-8">
                     <Loader2 className="w-6 h-6 mx-auto mb-2 text-blue-600 animate-spin" />
@@ -1340,8 +1616,18 @@ const MultiAgentDemo = () => {
                   </div>
                 ) : (
                   <div className="space-y-1">
-                    {Object.entries(agentLibrary)
+                    {getFilteredAgents()
                     .sort(([idA, agentA], [idB, agentB]) => {
+                      // First sort by company priority
+                      const priorityA = getAgentPriority(idA);
+                      const priorityB = getAgentPriority(idB);
+                      const priorityOrder = { 'primary': 0, 'secondary': 1, 'other': 2 };
+                      
+                      if (priorityOrder[priorityA] !== priorityOrder[priorityB]) {
+                        return priorityOrder[priorityA] - priorityOrder[priorityB];
+                      }
+                      
+                      // Then sort by activity status
                       const isActiveA = activeAgents.includes(idA) || currentQueryAgents.includes(idA);
                       const isActiveB = activeAgents.includes(idB) || currentQueryAgents.includes(idB);
                       const hasAnalysisA = agentAnalysis[idA];
@@ -1349,7 +1635,6 @@ const MultiAgentDemo = () => {
                       const hasLiveStateA = liveAgentStates[agentA.name] || liveAgentStates[idA];
                       const hasLiveStateB = liveAgentStates[agentB.name] || liveAgentStates[idB];
 
-                      // Sort by: currently active > completed analysis > has live state > inactive
                       if (activeAgents.includes(idA) && !activeAgents.includes(idB)) return -1;
                       if (activeAgents.includes(idB) && !activeAgents.includes(idA)) return 1;
                       if (hasLiveStateA && !hasLiveStateB) return -1;
@@ -1360,17 +1645,18 @@ const MultiAgentDemo = () => {
                       if (isActiveB && !isActiveA) return 1;
                       return 0;
                     })
-                    .map(([id, agent]) => {
+                    .map(([id, agent], index) => {
                       const isCurrentlyActive = activeAgents.includes(id);
                       const wasUsedInQuery = currentQueryAgents.includes(id);
                       const hasAnalysis = agentAnalysis[id];
                       const liveState = liveAgentStates[agent.name] || liveAgentStates[id];
                       const isLiveActive = liveState && ['ANALYZING', 'PROCESSING', 'COLLABORATING'].includes(liveState.status);
                       const isLiveFinished = liveState && liveState.status === 'FINISHED';
+                      const priority = getAgentPriority(agent.name);
 
                       return (
                         <div 
-                          key={id} 
+                          key={`agent-${id}-${index}-${targetCompany}`} 
                           className={`flex items-center space-x-2 text-sm py-2 px-2 rounded transition-all ${
                             isCurrentlyActive || isLiveActive
                               ? 'bg-blue-100 border border-blue-300 shadow-sm' 
@@ -1378,8 +1664,12 @@ const MultiAgentDemo = () => {
                                 ? 'bg-green-50 border border-green-200'
                                 : liveState
                                   ? 'bg-gray-50 border border-gray-200'
-                                  : 'hover:bg-gray-50'
-                          }`}
+                                  : priority === 'primary'
+                                    ? 'hover:bg-green-50 border border-green-100'
+                                    : priority === 'secondary'
+                                      ? 'hover:bg-blue-50 border border-blue-100'
+                                      : 'hover:bg-gray-50'
+                          } ${priority !== 'other' ? 'border' : ''}`}
                         >
                           <div className="relative">
                             <span className="text-lg">{agent.avatar}</span>
@@ -1389,16 +1679,34 @@ const MultiAgentDemo = () => {
                             {(!isCurrentlyActive && !isLiveActive) && (isLiveFinished || hasAnalysis) && (
                               <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full"></div>
                             )}
+                            {/* Priority indicator */}
+                            {(!isCurrentlyActive && !isLiveActive && !isLiveFinished && !hasAnalysis) && priority !== 'other' && (
+                              <div className={`absolute -bottom-1 -right-1 w-2 h-2 rounded-full ${
+                                priority === 'primary' ? 'bg-green-500' : 'bg-blue-500'
+                              }`}></div>
+                            )}
                           </div>
                           <div className="flex-1">
                             <div className="flex items-center">
                               <span className={`font-medium ${
                                 isCurrentlyActive || isLiveActive ? 'text-blue-900' : 
                                 isLiveFinished || (wasUsedInQuery && hasAnalysis) ? 'text-green-900' : 
-                                liveState ? 'text-gray-800' : 'text-gray-700'
+                                liveState ? 'text-gray-800' : 
+                                priority === 'primary' ? 'text-green-800' :
+                                priority === 'secondary' ? 'text-blue-800' : 'text-gray-700'
                               }`}>
                                 {agent.name}
                               </span>
+                              {priority === 'primary' && !isCurrentlyActive && !isLiveActive && !hasAnalysis && (
+                                <span className="ml-2 text-xs px-1.5 py-0.5 bg-green-100 text-green-700 rounded">
+                                  Primary
+                                </span>
+                              )}
+                              {priority === 'secondary' && !isCurrentlyActive && !isLiveActive && !hasAnalysis && (
+                                <span className="ml-2 text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">
+                                  Secondary
+                                </span>
+                              )}
                               {(isCurrentlyActive || isLiveActive) && (
                                 <Loader2 className="w-3 h-3 ml-2 text-blue-500 animate-spin" />
                               )}
