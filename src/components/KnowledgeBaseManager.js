@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Database, Search, Globe, FileText, BarChart3, RefreshCw, Settings } from 'lucide-react';
+import { Database, Search, Globe, FileText, RefreshCw, Settings } from 'lucide-react';
 
 const KnowledgeBaseManager = () => {
   const [knowledgeStatus, setKnowledgeStatus] = useState(null);
