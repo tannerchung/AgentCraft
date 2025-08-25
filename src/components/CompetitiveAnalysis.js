@@ -8,11 +8,17 @@ const CompetitiveAnalysis = () => {
   const [error, setError] = useState(null);
   const [selectedCompetitor, setSelectedCompetitor] = useState('AgentForce');
 
+  const getApiUrl = () => {
+    return process.env.NODE_ENV === 'development' 
+      ? 'http://localhost:8000' 
+      : window.location.origin.replace(':3000', ':8000');
+  };
+
   const runCompetitiveAnalysis = async () => {
     setIsLoading(true);
     setError(null); // Clear previous errors
     try {
-      const response = await axios.post('http://localhost:8000/api/competitive-analysis', {
+      const response = await axios.post(`${getApiUrl()}/api/competitive-analysis`, {
         competitor: selectedCompetitor,
         focus_areas: ['pricing', 'capabilities', 'limitations']
       });

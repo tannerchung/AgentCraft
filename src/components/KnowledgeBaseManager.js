@@ -25,7 +25,10 @@ const KnowledgeBaseManager = () => {
 
   const loadKnowledgeStatus = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/knowledge/knowledge-base/status');
+      const apiUrl = process.env.NODE_ENV === 'development' 
+        ? 'http://localhost:8000' 
+        : window.location.origin.replace(':3000', ':8000');
+      const response = await fetch(`${apiUrl}/api/knowledge/knowledge-base/status`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -38,9 +41,15 @@ const KnowledgeBaseManager = () => {
     }
   };
 
+  const getApiUrl = () => {
+    return process.env.NODE_ENV === 'development' 
+      ? 'http://localhost:8000' 
+      : window.location.origin.replace(':3000', ':8000');
+  };
+
   const loadCompanies = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/knowledge/companies');
+      const response = await fetch(`${getApiUrl()}/api/knowledge/companies`);
       const data = await response.json();
       if (data.success) {
         setAvailableCompanies(data.companies);
@@ -53,7 +62,7 @@ const KnowledgeBaseManager = () => {
 
   const loadCompanyCrawlUrls = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/knowledge/crawl/company-urls');
+      const response = await fetch(`${getApiUrl()}/api/knowledge/crawl/company-urls`);
       const data = await response.json();
       if (data.success) {
         setCrawlUrls(data.urls);
@@ -66,7 +75,7 @@ const KnowledgeBaseManager = () => {
   const switchCompany = async (companyId) => {
     setIsLoading(true);
     try {
-      const response = await fetch('http://localhost:8000/api/knowledge/switch-company', {
+      const response = await fetch(`${getApiUrl()}/api/knowledge/switch-company`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ company_id: companyId })
@@ -89,7 +98,7 @@ const KnowledgeBaseManager = () => {
     
     setIsLoading(true);
     try {
-      const response = await fetch('http://localhost:8000/api/knowledge/knowledge-base/search', {
+      const response = await fetch(`${getApiUrl()}/api/knowledge/knowledge-base/search`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -113,7 +122,7 @@ const KnowledgeBaseManager = () => {
   const generateTrainingData = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch('http://localhost:8000/api/knowledge/training-data/generate?count=50', {
+      const response = await fetch(`${getApiUrl()}/api/knowledge/training-data/generate?count=50`, {
         method: 'POST'
       });
       
@@ -131,7 +140,7 @@ const KnowledgeBaseManager = () => {
   const startCrawling = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch('http://localhost:8000/api/knowledge/crawl/urls', {
+      const response = await fetch(`${getApiUrl()}/api/knowledge/crawl/urls`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -155,7 +164,7 @@ const KnowledgeBaseManager = () => {
   const rebuildKnowledgeBase = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch('http://localhost:8000/api/knowledge/knowledge-base/rebuild', {
+      const response = await fetch(`${getApiUrl()}/api/knowledge/knowledge-base/rebuild`, {
         method: 'POST'
       });
       

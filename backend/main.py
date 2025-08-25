@@ -1372,4 +1372,5 @@ async def test_adaptive_system_endpoint(test_queries: List[Dict[str, Any]]):
 if __name__ == "__main__":
     import uvicorn
     logging.basicConfig(level=logging.INFO)
+    logging.info("Starting AgentCraft backend server on 0.0.0.0:8000")
     uvicorn.run(app, host="0.0.0.0", port=8000)
