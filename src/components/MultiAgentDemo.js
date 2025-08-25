@@ -34,7 +34,7 @@ const MessageContent = ({ content }) => {
     .trim();
 
   // Check if content looks like it has markdown formatting
-  const hasMarkdown = /[*_#`\[\]]/g.test(processedContent);
+  const hasMarkdown = /[*_#`[\]]/g.test(processedContent);
   
   // If no markdown detected and has newlines, convert to basic markdown
   if (!hasMarkdown && processedContent.includes('\n')) {
@@ -193,165 +193,238 @@ const MultiAgentDemo = () => {
   const [feedbackRating, setFeedbackRating] = useState(0);
   const [feedbackComment, setFeedbackComment] = useState('');
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
+
+  // WebSocket and real-time tracking state
+  const [websocket, setWebsocket] = useState(null);
+  const [connectionStatus, setConnectionStatus] = useState('disconnected');
+  const [realTimeSession, setRealTimeSession] = useState(null);
+  const [liveAgentStates, setLiveAgentStates] = useState({});
   
   const debugConsoleRef = useRef(null);
   const chatEndRef = useRef(null);
+  const clientId = useRef(`client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
 
-  // Agent definitions - Full library (simulating CrewAI agents)
-  // Note: Currently using simulation. Real CrewAI integration available via backend API
-  const agentLibrary = {
-    // Orchestration
-    orchestrator: {
-      name: "Orchestration Agent",
-      avatar: "🧠",
-      color: "purple",
-      role: "Query analysis and agent coordination",
-      keywords: ["routing", "synthesis", "coordination"]
-    },
+  // Agent library - loaded from database API
+  const [agentLibrary, setAgentLibrary] = useState({});
+  const [agentLibraryLoading, setAgentLibraryLoading] = useState(true);
+  const [agentLibraryError, setAgentLibraryError] = useState(null);
+
+  // Load agent library from database API
+  useEffect(() => {
+    const fetchAgentLibrary = async () => {
+      setAgentLibraryLoading(true);
+      setAgentLibraryError(null);
+      
+      try {
+        const response = await axios.get('http://localhost:8000/api/agents/list');
+        
+        if (response.data.success) {
+          setAgentLibrary(response.data.agents);
+          addDebugLog('system', 'info', `Loaded ${response.data.total_count} agents from database`);
+        } else {
+          throw new Error(response.data.error || 'Failed to load agents');
+        }
+      } catch (error) {
+        console.error('Error loading agent library:', error);
+        setAgentLibraryError(error.message);
+        addDebugLog('system', 'error', `Failed to load agent library: ${error.message}`);
+      } finally {
+        setAgentLibraryLoading(false);
+      }
+    };
     
-    // Technical Domain (4 agents)
-    technical: {
-      name: "Technical Integration Specialist",
-      avatar: "🔧",
-      color: "blue",
-      role: "API, webhook, and integration issues",
-      keywords: ["webhook", "api", "ssl", "integration", "authentication", "timeout", "certificate"]
-    },
-    devops: {
-      name: "DevOps Engineer",
-      avatar: "⚙️",
-      color: "cyan",
-      role: "Deployment, infrastructure, and monitoring",
-      keywords: ["deployment", "docker", "kubernetes", "ci/cd", "monitoring", "infrastructure", "pipeline"]
-    },
-    security: {
-      name: "Security Specialist",
-      avatar: "🛡️",
-      color: "red",
-      role: "Security audits and vulnerability assessment",
-      keywords: ["security", "vulnerability", "encryption", "compliance", "oauth", "gdpr", "audit"]
-    },
-    database: {
-      name: "Database Expert",
-      avatar: "🗄️",
-      color: "indigo",
-      role: "Database optimization and migrations",
-      keywords: ["database", "sql", "migration", "optimization", "query", "index", "schema"]
-    },
+    fetchAgentLibrary();
+  }, []);
+
+  // WebSocket connection for real-time agent tracking
+  useEffect(() => {
+    const connectWebSocket = () => {
+      try {
+        const ws = new WebSocket(`ws://localhost:8000/api/ws/agent-tracking/${clientId.current}`);
+        
+        ws.onopen = () => {
+          setConnectionStatus('connected');
+          setWebsocket(ws);
+          addDebugLog('websocket', 'system', 'Connected to real-time agent tracking');
+        };
+        
+        ws.onmessage = (event) => {
+          try {
+            const message = JSON.parse(event.data);
+            handleWebSocketMessage(message);
+          } catch (err) {
+            console.error('Error parsing WebSocket message:', err);
+          }
+        };
+        
+        ws.onclose = () => {
+          setConnectionStatus('disconnected');
+          setWebsocket(null);
+          addDebugLog('websocket', 'system', 'Disconnected from real-time tracking');
+          
+          // Attempt to reconnect after 3 seconds
+          setTimeout(() => {
+            if (connectionStatus !== 'connected') {
+              connectWebSocket();
+            }
+          }, 3000);
+        };
+        
+        ws.onerror = (error) => {
+          console.error('WebSocket error:', error);
+          setConnectionStatus('error');
+          addDebugLog('websocket', 'system', 'WebSocket connection error');
+        };
+        
+      } catch (err) {
+        console.error('Failed to create WebSocket connection:', err);
+        setConnectionStatus('error');
+      }
+    };
+
+    connectWebSocket();
     
-    // Business Domain (4 agents)
-    billing: {
-      name: "Billing & Revenue Expert",
-      avatar: "💳",
-      color: "green",
-      role: "Payment processing and subscription management",
-      keywords: ["billing", "payment", "subscription", "invoice", "revenue", "refund", "dunning"]
-    },
-    legal: {
-      name: "Legal Compliance Agent",
-      avatar: "⚖️",
-      color: "gray",
-      role: "Contract analysis and compliance",
-      keywords: ["legal", "contract", "compliance", "gdpr", "privacy", "terms", "policy"]
-    },
-    sales: {
-      name: "Sales Operations Specialist",
-      avatar: "📈",
-      color: "teal",
-      role: "CRM management and lead qualification",
-      keywords: ["sales", "crm", "lead", "pipeline", "salesforce", "qualification", "territory"]
-    },
-    marketing: {
-      name: "Marketing Automation Expert",
-      avatar: "📢",
-      color: "pink",
-      role: "Campaign management and lead nurturing",
-      keywords: ["marketing", "campaign", "automation", "email", "lead", "nurturing", "attribution"]
-    },
+    // Cleanup on unmount
+    return () => {
+      if (websocket) {
+        websocket.close();
+      }
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Handle WebSocket messages for real-time updates
+  const handleWebSocketMessage = (message) => {
+    const { type, data, timestamp, session_id } = message;
     
-    // Analysis Domain (3 agents)
-    competitive: {
-      name: "Competitive Intelligence Analyst",
-      avatar: "🎯",
-      color: "orange",
-      role: "Market research and competitive positioning",
-      keywords: ["competitive", "competitor", "market", "analysis", "positioning", "strategy", "intelligence"]
-    },
-    analytics: {
-      name: "Data Analytics Specialist",
-      avatar: "📊",
-      color: "yellow",
-      role: "Business intelligence and reporting",
-      keywords: ["analytics", "data", "dashboard", "reporting", "kpi", "metrics", "intelligence"]
-    },
-    finance: {
-      name: "Financial Analyst",
-      avatar: "💰",
-      color: "emerald",
-      role: "Financial modeling and cost analysis",
-      keywords: ["financial", "budget", "forecast", "roi", "cost", "revenue", "modeling"]
-    },
-    
-    // Customer Domain (2 agents)
-    support: {
-      name: "Customer Success Manager",
-      avatar: "🎯",
-      color: "violet",
-      role: "Customer onboarding and retention",
-      keywords: ["customer", "success", "onboarding", "retention", "churn", "satisfaction", "engagement"]
-    },
-    training: {
-      name: "Training & Education Specialist",
-      avatar: "🎓",
-      color: "amber",
-      role: "User education and documentation",
-      keywords: ["training", "education", "documentation", "tutorial", "knowledge", "learning", "guide"]
-    },
-    
-    // Product Domain (2 agents)
-    product: {
-      name: "Product Manager",
-      avatar: "🚀",
-      color: "fuchsia",
-      role: "Product strategy and roadmap planning",
-      keywords: ["product", "roadmap", "feature", "strategy", "requirements", "user", "market"]
-    },
-    ux: {
-      name: "UX Research Specialist",
-      avatar: "🎨",
-      color: "rose",
-      role: "User experience research and design",
-      keywords: ["ux", "user", "design", "usability", "research", "interface", "experience"]
-    },
-    
-    // Industry Specialists (4 agents)
-    healthcare: {
-      name: "Healthcare Compliance Expert",
-      avatar: "🏥",
-      color: "lime",
-      role: "HIPAA compliance and medical data",
-      keywords: ["healthcare", "hipaa", "medical", "patient", "compliance", "phi", "regulation"]
-    },
-    fintech: {
-      name: "Financial Services Specialist",
-      avatar: "🏦",
-      color: "slate",
-      role: "Banking regulations and PCI compliance",
-      keywords: ["fintech", "banking", "pci", "financial", "regulation", "compliance", "security"]
-    },
-    ecommerce: {
-      name: "E-commerce Platform Expert",
-      avatar: "🛒",
-      color: "purple",
-      role: "Online retail and payment processing",
-      keywords: ["ecommerce", "retail", "shopping", "cart", "inventory", "payment", "order"]
-    },
-    saas: {
-      name: "SaaS Business Model Expert",
-      avatar: "☁️",
-      color: "sky",
-      role: "Subscription models and platform scaling",
-      keywords: ["saas", "subscription", "metrics", "scaling", "tenant", "churn", "mrr"]
+    switch (type) {
+      case 'session_started':
+        setRealTimeSession(session_id);
+        setLiveAgentStates({});
+        setCurrentQueryAgents(data.agent_names || []);
+        addDebugLog('crewai', 'realtime', `Session started: ${session_id}`);
+        addDebugLog('crewai', 'realtime', `Agents: ${(data.agent_names || []).join(', ')}`);
+        break;
+        
+      case 'agent_status_update':
+        if (data.session_id === realTimeSession || !realTimeSession) {
+          const agentName = data.agent_name;
+          const status = data.status;
+          const progress = data.progress || 0;
+          
+          setLiveAgentStates(prev => ({
+            ...prev,
+            [agentName]: {
+              status,
+              progress,
+              current_task: data.current_task || '',
+              details: data.details || '',
+              updated_at: timestamp
+            }
+          }));
+          
+          // Update active agents list
+          if (status === 'ANALYZING' || status === 'PROCESSING' || status === 'COLLABORATING') {
+            setActiveAgents(prev => {
+              if (!prev.includes(agentName)) {
+                return [...prev, agentName];
+              }
+              return prev;
+            });
+          } else if (status === 'FINISHED' || status === 'ERROR') {
+            setActiveAgents(prev => prev.filter(name => name !== agentName));
+          }
+          
+          const statusText = status.toLowerCase().replace('_', ' ');
+          addDebugLog('crewai', 'agent_update', 
+            `${agentName}: ${statusText} (${progress}%) - ${data.details || data.current_task || ''}`
+          );
+        }
+        break;
+        
+      case 'crew_output':
+        if (data.session_id === realTimeSession || !realTimeSession) {
+          const outputType = data.output_type || 'general';
+          const content = data.content || '';
+          const agentName = data.agent_name || 'system';
+          
+          addDebugLog('crewai', agentName, `[${outputType}] ${content}`);
+        }
+        break;
+        
+      case 'phase_update':
+        if (data.session_id === realTimeSession || !realTimeSession) {
+          addDebugLog('crewai', 'orchestrator', `Phase: ${data.phase}`);
+        }
+        break;
+        
+      case 'session_complete':
+        if (data.session_id === realTimeSession || !realTimeSession) {
+          setActiveAgents([]);
+          addDebugLog('crewai', 'realtime', 'Session completed');
+          setRealTimeSession(null);
+        }
+        break;
+        
+      case 'session_error':
+        if (data.session_id === realTimeSession || !realTimeSession) {
+          setActiveAgents([]);
+          addDebugLog('error', 'crewai', `Session error: ${data.error}`);
+          setRealTimeSession(null);
+        }
+        break;
+        
+      case 'crewai_log':
+        // Handle CrewAI log streaming
+        if (message.log) {
+          const log = message.log;
+          const logLevel = log.level || 'INFO';
+          const logMessage = log.message || log.raw_message || '';
+          
+          // Format log message for debug console
+          let displayMessage = logMessage;
+          if (log.agent_info && log.agent_info.agent_name) {
+            displayMessage = `[${log.agent_info.agent_name}] ${logMessage}`;
+          }
+          
+          // Add to debug logs with appropriate level
+          const debugLevel = logLevel.toLowerCase() === 'error' ? 'error' : 
+                           logLevel.toLowerCase() === 'warning' ? 'warning' : 'info';
+          
+          addDebugLog('crewai', debugLevel, displayMessage);
+          
+          // If it's an agent-specific event, update live agent states
+          if (log.event_type && log.agent_info && log.agent_info.agent_name) {
+            const agentName = log.agent_info.agent_name;
+            setLiveAgentStates(prev => ({
+              ...prev,
+              [agentName]: {
+                ...prev[agentName],
+                last_log: displayMessage,
+                last_event: log.event_type,
+                updated_at: log.timestamp
+              }
+            }));
+          }
+        }
+        break;
+        
+      case 'log_streaming_started':
+        addDebugLog('websocket', 'system', `CrewAI log streaming started for session: ${message.session_id}`);
+        break;
+        
+      case 'log_streaming_stopped':
+        addDebugLog('websocket', 'system', 'CrewAI log streaming stopped');
+        break;
+        
+      case 'ping':
+        // Send pong response to keep connection alive
+        if (websocket && websocket.readyState === WebSocket.OPEN) {
+          websocket.send(JSON.stringify({ type: 'pong' }));
+        }
+        break;
+        
+      default:
+        console.log('Unknown WebSocket message type:', type, message);
     }
   };
 
@@ -562,14 +635,29 @@ const MultiAgentDemo = () => {
       // ALWAYS USE REAL CREWAI - No more simulation
       addDebugLog('routing', 'system', 'Processing with CrewAI agents via backend API');
       
+      // Start log streaming for this session
+      if (websocket && websocket.readyState === WebSocket.OPEN) {
+        const sessionId = `chat_${Date.now()}`;
+        websocket.send(JSON.stringify({ 
+          type: 'start_log_streaming',
+          session_id: sessionId 
+        }));
+        addDebugLog('websocket', 'system', `Started CrewAI log streaming for session: ${sessionId}`);
+      }
+      
       try {
+        // Generate session ID for tracking
+        const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        
         // Call the real backend API that uses CrewAI
         const response = await axios.post('http://localhost:8000/api/chat', {
           agent_type: 'multi-agent',
           message: userMessage.content,
           context: {
             orchestration_mode: true,
-            debug_enabled: true
+            debug_enabled: true,
+            tracking_session_id: sessionId,
+            websocket_client_id: clientId.current
           }
         });
           
@@ -662,7 +750,8 @@ const MultiAgentDemo = () => {
     }
   };
 
-  // Simulation logic (extracted for reuse)
+  // Simulation logic (extracted for reuse) - currently unused but kept for future simulation mode
+  /*
   const runSimulation = async (userMessage) => {
     // Step 1: Agent Selection
     const selectedAgents = selectAgents(userMessage.content);
@@ -725,6 +814,7 @@ const MultiAgentDemo = () => {
       `Simulated response delivered (${selectedAgents.length} agents, 3.2s total)`
     );
   };
+  */
 
   // Generate customer service response from agent analyses
   const generateCustomerResponse = (analysisMap) => {
@@ -828,6 +918,8 @@ const MultiAgentDemo = () => {
     setFeedbackRating(0);
     setFeedbackComment('');
     setFeedbackSubmitted(false);
+    setRealTimeSession(null);
+    setLiveAgentStates({});
     addDebugLog('system', 'conversation', 'Conversation ended - session reset');
   };
 
@@ -873,9 +965,21 @@ const MultiAgentDemo = () => {
           <h1 className="text-3xl font-bold text-gray-900 flex items-center">
             <Users className="w-8 h-8 mr-3 text-blue-600" />
             Multi-Agent Orchestration Demo
+            <div className={`ml-4 flex items-center text-sm px-3 py-1 rounded-full ${
+              connectionStatus === 'connected' ? 'bg-green-100 text-green-700' :
+              connectionStatus === 'error' ? 'bg-red-100 text-red-700' :
+              'bg-yellow-100 text-yellow-700'
+            }`}>
+              <div className={`w-2 h-2 rounded-full mr-2 ${
+                connectionStatus === 'connected' ? 'bg-green-500' :
+                connectionStatus === 'error' ? 'bg-red-500' :
+                'bg-yellow-500'
+              }`}></div>
+              Real-time {connectionStatus}
+            </div>
           </h1>
           <p className="text-gray-600 mt-2">
-            Experience CrewAI-powered agent coordination with debug transparency and HITL capabilities
+            Experience CrewAI-powered agent coordination with live WebSocket updates, debug transparency and HITL capabilities
           </p>
         </div>
 
@@ -894,6 +998,96 @@ const MultiAgentDemo = () => {
                 </p>
               </div>
               
+              {/* Real-time Agent Activity Display */}
+              {realTimeSession && Object.values(liveAgentStates).some(agent => agent && agent.status && agent.status !== 'idle') && (
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4 mx-6 mb-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center">
+                      <Activity className="w-4 h-4 text-blue-600 mr-2 animate-pulse" />
+                      <h4 className="font-medium text-blue-900">Active Agents</h4>
+                      <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
+                        {Object.values(liveAgentStates).filter(agent => agent && agent.status && agent.status !== 'idle' && agent.status !== 'finished').length} working
+                      </span>
+                    </div>
+                    <div className="text-xs text-blue-600">
+                      {realTimeSession.overall_progress?.toFixed(1)}% complete
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {Object.values(liveAgentStates)
+                      .filter(agent => agent && agent.status !== 'idle')
+                      .map(agent => (
+                        <div key={agent.agent_id} className="bg-white rounded-lg p-3 border border-blue-100">
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-start min-w-0 flex-1">
+                              {/* Agent Avatar from database */}
+                              <div className="text-lg mr-2 flex-shrink-0">
+                                {(agent.agent_name && agentLibrary[agent.agent_name.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')]?.avatar) || '🤖'}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center">
+                                  <h5 className="font-medium text-gray-900 text-sm truncate">
+                                    {agent.agent_name || 'Unknown Agent'}
+                                  </h5>
+                                  <div className={`ml-2 w-2 h-2 rounded-full flex-shrink-0 ${
+                                    agent.status === 'analyzing' ? 'bg-yellow-400 animate-pulse' :
+                                    agent.status === 'processing' ? 'bg-blue-500 animate-pulse' :
+                                    agent.status === 'collaborating' ? 'bg-purple-500 animate-pulse' :
+                                    agent.status === 'completing' ? 'bg-orange-500 animate-pulse' :
+                                    agent.status === 'finished' ? 'bg-green-500' :
+                                    agent.status === 'error' ? 'bg-red-500' : 'bg-gray-400'
+                                  }`}></div>
+                                </div>
+                                
+                                <div className="text-xs text-gray-600 mt-1 capitalize">
+                                  {agent.status.replace('_', ' ')}
+                                  {agent.current_task && (
+                                    <span className="block mt-1 text-gray-500 truncate">
+                                      {agent.current_task}
+                                    </span>
+                                  )}
+                                </div>
+                                
+                                {/* Progress bar */}
+                                {agent.progress > 0 && (
+                                  <div className="mt-2">
+                                    <div className="flex justify-between items-center mb-1">
+                                      <span className="text-xs text-gray-500">Progress</span>
+                                      <span className="text-xs text-gray-600">{agent.progress.toFixed(0)}%</span>
+                                    </div>
+                                    <div className="w-full bg-gray-200 rounded-full h-1.5">
+                                      <div 
+                                        className="bg-blue-600 h-1.5 rounded-full transition-all duration-300"
+                                        style={{ width: `${agent.progress}%` }}
+                                      ></div>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                  
+                  {/* Current Phase Indicator */}
+                  {realTimeSession.current_phase && (
+                    <div className="mt-3 pt-3 border-t border-blue-100">
+                      <div className="flex items-center text-xs text-blue-700">
+                        <Clock className="w-3 h-3 mr-1" />
+                        <span className="capitalize">Phase: {realTimeSession.current_phase.replace('_', ' ')}</span>
+                        {realTimeSession.estimated_completion && (
+                          <span className="ml-2 text-blue-600">
+                            • ETA: {new Date(realTimeSession.estimated_completion * 1000).toLocaleTimeString()}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="h-96 overflow-y-auto p-6 space-y-4">
                 {messages.length === 0 ? (
                   <div className="text-center text-gray-500 py-8">
@@ -1103,7 +1297,16 @@ const MultiAgentDemo = () => {
               <div className="px-4 py-3 border-b">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="font-semibold text-gray-900">Agent Library</h3>
-                  <span className="text-xs text-gray-500">{Object.keys(agentLibrary).length} agents</span>
+                  {agentLibraryLoading ? (
+                    <div className="flex items-center text-xs text-blue-600">
+                      <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                      Loading...
+                    </div>
+                  ) : agentLibraryError ? (
+                    <span className="text-xs text-red-600">Error loading</span>
+                  ) : (
+                    <span className="text-xs text-gray-500">{Object.keys(agentLibrary).length} agents</span>
+                  )}
                 </div>
                 {currentQueryAgents.length > 0 && (
                   <div className="flex items-center text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
@@ -1114,17 +1317,44 @@ const MultiAgentDemo = () => {
                 )}
               </div>
               <div className="p-4 space-y-2 max-h-80 overflow-y-auto">
-                <div className="space-y-1">
-                  {Object.entries(agentLibrary)
-                    .sort(([idA, _agentA], [idB, _agentB]) => {
+                {agentLibraryLoading ? (
+                  <div className="text-center py-8">
+                    <Loader2 className="w-6 h-6 mx-auto mb-2 text-blue-600 animate-spin" />
+                    <p className="text-sm text-gray-500">Loading agents from database...</p>
+                  </div>
+                ) : agentLibraryError ? (
+                  <div className="text-center py-8">
+                    <AlertTriangle className="w-6 h-6 mx-auto mb-2 text-red-600" />
+                    <p className="text-sm text-red-600 mb-2">Failed to load agents</p>
+                    <p className="text-xs text-gray-500">{agentLibraryError}</p>
+                    <button 
+                      onClick={() => window.location.reload()} 
+                      className="mt-2 text-xs text-blue-600 hover:text-blue-800"
+                    >
+                      Retry
+                    </button>
+                  </div>
+                ) : Object.keys(agentLibrary).length === 0 ? (
+                  <div className="text-center py-8">
+                    <Users className="w-6 h-6 mx-auto mb-2 text-gray-400" />
+                    <p className="text-sm text-gray-500">No agents available</p>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    {Object.entries(agentLibrary)
+                    .sort(([idA, agentA], [idB, agentB]) => {
                       const isActiveA = activeAgents.includes(idA) || currentQueryAgents.includes(idA);
                       const isActiveB = activeAgents.includes(idB) || currentQueryAgents.includes(idB);
                       const hasAnalysisA = agentAnalysis[idA];
                       const hasAnalysisB = agentAnalysis[idB];
+                      const hasLiveStateA = liveAgentStates[agentA.name] || liveAgentStates[idA];
+                      const hasLiveStateB = liveAgentStates[agentB.name] || liveAgentStates[idB];
                       
-                      // Sort by: currently active > completed analysis > inactive
+                      // Sort by: currently active > completed analysis > has live state > inactive
                       if (activeAgents.includes(idA) && !activeAgents.includes(idB)) return -1;
                       if (activeAgents.includes(idB) && !activeAgents.includes(idA)) return 1;
+                      if (hasLiveStateA && !hasLiveStateB) return -1;
+                      if (hasLiveStateB && !hasLiveStateA) return 1;
                       if (hasAnalysisA && !hasAnalysisB) return -1;
                       if (hasAnalysisB && !hasAnalysisA) return 1;
                       if (isActiveA && !isActiveB) return -1;
@@ -1135,44 +1365,70 @@ const MultiAgentDemo = () => {
                       const isCurrentlyActive = activeAgents.includes(id);
                       const wasUsedInQuery = currentQueryAgents.includes(id);
                       const hasAnalysis = agentAnalysis[id];
+                      const liveState = liveAgentStates[agent.name] || liveAgentStates[id];
+                      const isLiveActive = liveState && ['ANALYZING', 'PROCESSING', 'COLLABORATING'].includes(liveState.status);
+                      const isLiveFinished = liveState && liveState.status === 'FINISHED';
                       
                       return (
                         <div 
                           key={id} 
                           className={`flex items-center space-x-2 text-sm py-2 px-2 rounded transition-all ${
-                            isCurrentlyActive 
+                            isCurrentlyActive || isLiveActive
                               ? 'bg-blue-100 border border-blue-300 shadow-sm' 
-                              : wasUsedInQuery && hasAnalysis
+                              : isLiveFinished || (wasUsedInQuery && hasAnalysis)
                                 ? 'bg-green-50 border border-green-200'
-                                : 'hover:bg-gray-50'
+                                : liveState
+                                  ? 'bg-gray-50 border border-gray-200'
+                                  : 'hover:bg-gray-50'
                           }`}
                         >
                           <div className="relative">
                             <span className="text-lg">{agent.avatar}</span>
-                            {isCurrentlyActive && (
+                            {(isCurrentlyActive || isLiveActive) && (
                               <div className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
                             )}
-                            {!isCurrentlyActive && hasAnalysis && (
+                            {(!isCurrentlyActive && !isLiveActive) && (isLiveFinished || hasAnalysis) && (
                               <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full"></div>
                             )}
                           </div>
                           <div className="flex-1">
                             <div className="flex items-center">
                               <span className={`font-medium ${
-                                isCurrentlyActive ? 'text-blue-900' : 
-                                wasUsedInQuery && hasAnalysis ? 'text-green-900' : 'text-gray-700'
+                                isCurrentlyActive || isLiveActive ? 'text-blue-900' : 
+                                isLiveFinished || (wasUsedInQuery && hasAnalysis) ? 'text-green-900' : 
+                                liveState ? 'text-gray-800' : 'text-gray-700'
                               }`}>
                                 {agent.name}
                               </span>
-                              {isCurrentlyActive && (
+                              {(isCurrentlyActive || isLiveActive) && (
                                 <Loader2 className="w-3 h-3 ml-2 text-blue-500 animate-spin" />
                               )}
-                              {!isCurrentlyActive && hasAnalysis && (
+                              {(!isCurrentlyActive && !isLiveActive) && (isLiveFinished || hasAnalysis) && (
                                 <CheckCircle className="w-3 h-3 ml-2 text-green-500" />
                               )}
                             </div>
                             <p className="text-xs text-gray-500">{agent.role}</p>
-                            {hasAnalysis && !isCurrentlyActive && (
+                            
+                            {/* Show live state info */}
+                            {liveState && (
+                              <div className="text-xs mt-1">
+                                <div className={`${
+                                  isLiveActive ? 'text-blue-600' : 
+                                  isLiveFinished ? 'text-green-600' : 
+                                  'text-gray-600'
+                                }`}>
+                                  {liveState.status.toLowerCase().replace('_', ' ')} ({liveState.progress}%)
+                                </div>
+                                {liveState.current_task && (
+                                  <div className="text-gray-500 truncate" title={liveState.current_task}>
+                                    {liveState.current_task.substring(0, 50)}...
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                            
+                            {/* Fallback to simulation analysis if no live state */}
+                            {!liveState && hasAnalysis && !isCurrentlyActive && (
                               <p className="text-xs text-green-600 mt-1">
                                 ✓ {hasAnalysis.findings.length} findings • {(hasAnalysis.confidence * 100).toFixed(0)}% confidence
                               </p>
@@ -1181,7 +1437,8 @@ const MultiAgentDemo = () => {
                         </div>
                       );
                     })}
-                </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>

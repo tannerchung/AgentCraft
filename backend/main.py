@@ -175,9 +175,11 @@ galileo_logger = None
 galileo_api_key = os.getenv('GALILEO_API_KEY')
 if galileo_api_key:
     try:
-        # Set Galileo environment variables
+        # Set Galileo environment variables - only CONSOLE_URL is needed
         os.environ['GALILEO_CONSOLE_URL'] = 'https://app.galileo.ai'
         os.environ['GALILEO_API_KEY'] = galileo_api_key
+        os.environ['GALILEO_PROJECT'] = os.getenv('GALILEO_PROJECT', 'AgentCraft')
+        os.environ['GALILEO_LOG_STREAM'] = os.getenv('GALILEO_LOG_STREAM', 'development')
         
         from galileo import GalileoLogger
         
@@ -194,22 +196,37 @@ else:
 # Add src to path for AgentCraft imports
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
+# Try to import enhanced database backend first
+ENHANCED_BACKEND_AVAILABLE = False
 try:
-    from src.agents.real_ai_technical_agent import real_technical_agent, performance_tracker, get_real_demo_scenarios
+    from backend.enhanced_backend import enhanced_backend
+    ENHANCED_BACKEND_AVAILABLE = True
     AGENTCRAFT_AVAILABLE = True
     AI_POWERED = True
-    logging.info("Real AI agents loaded successfully")
-except ImportError:
+    logging.info("Enhanced database backend loaded successfully")
+except ImportError as e:
+    logging.warning(f"Enhanced backend not available: {e}")
+
+logging.info(f"ENHANCED_BACKEND_AVAILABLE = {ENHANCED_BACKEND_AVAILABLE}")
+
+# Fallback to original agents if enhanced backend not available
+if not ENHANCED_BACKEND_AVAILABLE:
     try:
-        from src.core.agent_router import agent_router
-        from src.agents.technical_support_agent import get_technical_demo_scenarios
+        from src.agents.real_ai_technical_agent import real_technical_agent, performance_tracker, get_real_demo_scenarios
         AGENTCRAFT_AVAILABLE = True
-        AI_POWERED = False
-        logging.warning("Using template-based agents (not real AI)")
+        AI_POWERED = True
+        logging.info("Real AI agents loaded successfully")
     except ImportError:
-        AGENTCRAFT_AVAILABLE = False
-        AI_POWERED = False
-        logging.warning("AgentCraft modules not available, using mock responses")
+        try:
+            from src.core.agent_router import agent_router
+            from src.agents.technical_support_agent import get_technical_demo_scenarios
+            AGENTCRAFT_AVAILABLE = True
+            AI_POWERED = False
+            logging.warning("Using template-based agents (not real AI)")
+        except ImportError:
+            AGENTCRAFT_AVAILABLE = False
+            AI_POWERED = False
+            logging.warning("AgentCraft modules not available, using mock responses")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -229,6 +246,77 @@ async def lifespan(app: FastAPI):
     logging.info("AgentCraft system shutting down")
 
 app = FastAPI(title="AgentCraft API", version="1.0.0", lifespan=lifespan)
+
+# Include enhanced API routes if enhanced backend is available
+if ENHANCED_BACKEND_AVAILABLE:
+    try:
+        from backend.agent_management_api import router as agent_router
+        from backend.efficiency_api import router as efficiency_router
+        
+        app.include_router(agent_router)
+        app.include_router(efficiency_router)
+        
+        # Import WebSocket functionality and router
+        from backend.websocket_api import router as websocket_router, ws_manager, handle_client_message
+        app.include_router(websocket_router)
+        
+        logging.info("Enhanced API routes loaded: agent management, efficiency, WebSocket")
+    except ImportError as e:
+        logging.warning(f"Could not load enhanced API routes: {e}")
+
+# WebSocket endpoint - defined directly on app to avoid router issues
+if ENHANCED_BACKEND_AVAILABLE:
+    logging.info("Registering WebSocket endpoint at /api/ws/agent-tracking/{client_id}")
+    
+    @app.websocket("/api/ws/agent-tracking/{client_id}")
+    async def websocket_agent_tracking(websocket: WebSocket, client_id: str):
+        """WebSocket endpoint for real-time agent tracking"""
+        logging.info(f"WebSocket connection attempt from {client_id}")
+        await ws_manager.connect(websocket, client_id)
+        
+        try:
+            while True:
+                # Keep connection alive and handle client messages
+                try:
+                    data = await asyncio.wait_for(websocket.receive_text(), timeout=30.0)
+                    message = json.loads(data)
+                    
+                    # Handle client commands
+                    await handle_client_message(message, client_id)
+                    
+                except asyncio.TimeoutError:
+                    # Send ping to keep connection alive
+                    ping_message = {
+                        "type": "ping",
+                        "timestamp": asyncio.get_event_loop().time()
+                    }
+                    await ws_manager.send_personal_message(ping_message, client_id)
+                    
+        except WebSocketDisconnect:
+            await ws_manager.disconnect(client_id)
+        except Exception as e:
+            logging.error(f"WebSocket error for {client_id}: {e}")
+            await ws_manager.disconnect(client_id)
+
+    # WebSocket management REST endpoints
+    @app.get("/api/ws/stats")
+    async def get_websocket_stats():
+        """Get WebSocket connection statistics"""
+        from src.agents.realtime_agent_tracker import realtime_tracker
+        return {
+            "success": True,
+            "stats": ws_manager.get_connection_stats(),
+            "realtime_sessions": realtime_tracker.get_active_sessions_summary()
+        }
+
+    @app.post("/api/ws/broadcast")
+    async def broadcast_message(message: dict):
+        """Broadcast message to all connected WebSocket clients"""
+        try:
+            await ws_manager.broadcast(message)
+            return {"success": True, "message": "Broadcast sent"}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
 
 # CORS middleware for React frontend
 app.add_middleware(
@@ -291,8 +379,8 @@ async def chat_with_real_ai_agent(request: ChatMessage):
     if GALILEO_AVAILABLE and galileo_logger:
         try:
             trace_id = galileo_logger.start_trace(
-                name="chat_request",
                 input=request.message,  # Required input parameter
+                name="chat_request",
                 metadata={
                     "agent_type": request.agent_type,
                     "timestamp": datetime.now().isoformat()
@@ -303,7 +391,31 @@ async def chat_with_real_ai_agent(request: ChatMessage):
             logging.warning(f"Failed to start Galileo trace: {e}")
     
     try:
-        if AGENTCRAFT_AVAILABLE and AI_POWERED:
+        if ENHANCED_BACKEND_AVAILABLE:
+            # Use enhanced database-backed backend
+            result = await enhanced_backend.process_chat_request(
+                message=request.message,
+                agent_type=request.agent_type,
+                context=request.context
+            )
+            
+            # Log to Galileo if available
+            if GALILEO_AVAILABLE and galileo_logger and trace_id:
+                try:
+                    # Add LLM span for the enhanced response
+                    galileo_logger.add_llm_span(
+                        input=request.message,
+                        output=result["response"]["content"],
+                        model="enhanced_database_system"
+                    )
+                    logging.info(f"🔭 Galileo trace logged for enhanced backend")
+                except Exception as e:
+                    logging.warning(f"Failed to log enhanced backend to Galileo: {e}")
+            
+            return result
+            
+        elif AGENTCRAFT_AVAILABLE and AI_POWERED:
+            # Fallback to original AI agent
             # Check if CrewAI orchestration is requested
             context = request.context or {}
             if context.get('use_crewai', False):
@@ -358,9 +470,9 @@ async def chat_with_real_ai_agent(request: ChatMessage):
                     )
                     
                     # Conclude the trace
-                    galileo_logger.conclude(trace_id)
+                    galileo_logger.conclude(output=result["response"]["content"])
                     galileo_logger.flush()  # Send to Galileo
-                    logging.info(f"🔭 Galileo trace concluded and sent: {trace_id}")
+                    logging.info(f"🔭 Galileo trace concluded and sent")
                 except Exception as e:
                     logging.warning(f"Failed to log to Galileo: {e}")
             
@@ -419,6 +531,16 @@ async def chat_with_real_ai_agent(request: ChatMessage):
             "fallback_note": "This demonstrates the complexity of real AI systems",
             "troubleshooting": "Check ANTHROPIC_API_KEY environment variable"
         }
+    finally:
+        # Ensure Galileo traces are always concluded
+        if GALILEO_AVAILABLE and galileo_logger and trace_id:
+            try:
+                if galileo_logger.has_active_trace():
+                    galileo_logger.conclude(output="Request completed")
+                    galileo_logger.flush()
+                    logging.info("🔭 Galileo trace concluded in finally block")
+            except Exception as e:
+                logging.warning(f"Failed to conclude Galileo trace in finally: {e}")
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):

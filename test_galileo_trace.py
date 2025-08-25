@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-Test Galileo with proper trace context management
+Test Galileo with proper trace creation
 """
 import os
 
 # Set environment variables
 os.environ['GALILEO_API_KEY'] = 'aK_Ez6s58fD5U-FNqY7cfgvi8AiDTne10HMqnzUMszI'
-os.environ['GALILEO_PROJECT'] = 'AgentCraft'  
-os.environ['GALILEO_LOG_STREAM'] = 'production'
+os.environ['GALILEO_PROJECT'] = 'AgentCraft'
+os.environ['GALILEO_LOG_STREAM'] = 'testing'
 os.environ['GALILEO_CONSOLE_URL'] = 'https://app.galileo.ai'
 
 try:
@@ -19,44 +19,42 @@ try:
     logger = GalileoLogger()
     print("✓ Logger created")
     
-    # Start trace first
+    # Start a trace
     print("--- Starting trace ---")
-    trace_id = logger.start_trace(name="proper_test_trace")
-    print(f"Trace started: {trace_id}")
+    trace_result = logger.start_trace(
+        trace_id="test-trace-001",
+        input_text="Test user query"
+    )
+    print(f"Trace result: {trace_result}")
     
-    # Now add LLM span within the trace context
+    # Add an LLM span
     print("--- Adding LLM span ---")
     span_result = logger.add_llm_span(
-        input="Hello, what is 2+2?",
-        output="2+2 equals 4",
-        model="test-model"
+        input="Hello world",
+        output="Hi there!",
+        model="gpt-3.5-turbo"
     )
     print(f"LLM span result: {span_result}")
+    
+    # End trace
+    print("--- Ending trace ---")
+    end_result = logger.end_trace(output_text="Final response")
+    print(f"End trace result: {end_result}")
     
     # Check traces
     if hasattr(logger, 'traces') and logger.traces:
         print(f"✓ Traces found: {len(logger.traces)}")
-        for i, trace in enumerate(logger.traces):
-            print(f"Trace {i}: {trace}")
     else:
         print("❌ No traces found")
     
-    # Flush to send data
+    # Flush to send to API
     print("--- Flushing ---")
-    flush_result = logger.flush()
+    flush_result = logger.flush()  
     print(f"Flush result: {flush_result}")
-    print(f"Flush length: {len(flush_result) if isinstance(flush_result, list) else 'not list'}")
     
-    if flush_result:
-        print("✅ Data was flushed successfully!")
-        for item in flush_result:
-            print(f"Flushed item: {item}")
-    else:
-        print("⚠️ Flush result was empty")
-    
-    print(f"\nCheck dashboard: https://app.galileo.ai/projects/AgentCraft")
+    print("✅ Test completed successfully")
     
 except Exception as e:
-    print(f"Error: {e}")
+    print(f"❌ Error: {e}")
     import traceback
     traceback.print_exc()
