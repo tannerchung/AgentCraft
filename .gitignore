@@ -87,6 +87,9 @@ Thumbs.db
 .vscode/launch.json
 .vscode/extensions.json
 
+# Assets
+attached_assets/
+
 # MacOS
 .AppleDouble
 .LSOverride
