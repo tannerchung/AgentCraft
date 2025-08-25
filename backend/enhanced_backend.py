@@ -15,7 +15,7 @@ from uuid import UUID
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 from src.agents.enhanced_adaptive_system import enhanced_adaptive_system
-from database.models import metrics_manager, learning_manager, agent_manager
+from ..database.models import metrics_manager, learning_manager, agent_manager
 
 logger = logging.getLogger(__name__)
 

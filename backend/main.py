@@ -19,10 +19,10 @@ load_dotenv()
 
 # Import necessary routers from the backend
 try:
-    from backend.efficiency_api import router as efficiency_router
-    from backend.agent_management_api import router as agent_router
-    from backend.websocket_api import router as websocket_router
-    from backend.knowledge_api import router as knowledge_router  # Import knowledge router
+    from .efficiency_api import router as efficiency_router
+    from .agent_management_api import router as agent_router
+    from .websocket_api import router as websocket_router
+    from .knowledge_api import router as knowledge_router  # Import knowledge router
     BACKEND_IMPORTS_SUCCESSFUL = True
 except ImportError as e:
     logging.warning(f"Failed to import backend modules: {e}. Some API routes may be unavailable.")
@@ -210,7 +210,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 # Try to import enhanced database backend first
 ENHANCED_BACKEND_AVAILABLE = False
 try:
-    from backend.enhanced_backend import enhanced_backend
+    from .enhanced_backend import enhanced_backend
     ENHANCED_BACKEND_AVAILABLE = True
     AGENTCRAFT_AVAILABLE = True
     AI_POWERED = True
@@ -273,7 +273,7 @@ if BACKEND_IMPORTS_SUCCESSFUL:
 # WebSocket endpoint - defined directly on app to avoid router issues
 if BACKEND_IMPORTS_SUCCESSFUL:
     try:
-        from backend.websocket_api import ws_manager, handle_client_message
+        from .websocket_api import ws_manager, handle_client_message
 
         logging.info("Registering WebSocket endpoint at /api/ws/agent-tracking/{client_id}")
 
