@@ -195,18 +195,23 @@ python test_adaptive_system.py
 
 ## 🔧 Configuration
 
+### Quick Setup on Replit
+1. **Create PostgreSQL Database**: Click "Database" → "Create Database"
+2. **Setup Schema**: Run `python setup_replit_database.py`
+3. **Start Application**: Click the "Run" button
+
 ### Environment Variables
 ```bash
-# AI API Keys
+# AI API Keys (Optional - demo works without them)
 ANTHROPIC_API_KEY=sk-ant-...           # Claude API access
 OPENAI_API_KEY=sk-proj-...             # GPT model access
+
+# Database (Auto-configured by Replit)
+DATABASE_URL=postgresql://...          # Set automatically by Replit
 
 # Observability (Optional)
 GALILEO_API_KEY=...                    # AI observability platform
 GALILEO_PROJECT=AgentCraft             # Project identifier
-
-# Database (Optional)
-DATABASE_URL=postgresql://...          # PostgreSQL connection
 
 # Application
 ENVIRONMENT=production                 # Deployment environment

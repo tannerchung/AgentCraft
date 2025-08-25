@@ -26,6 +26,41 @@ def print_banner():
     """
     print(banner)
 
+def check_database_setup():
+    """Check if database is configured"""
+    database_url = os.getenv('DATABASE_URL')
+    if not database_url:
+        print("📊 PostgreSQL database not found!")
+        print("🔧 To set up PostgreSQL in Replit:")
+        print("   1. Click 'Database' in the left sidebar")
+        print("   2. Click 'Create Database'")
+        print("   3. Run: python database/setup.py")
+        print("   4. Restart AgentCraft")
+        return False
+    
+    # Check if database is accessible
+    try:
+        import asyncio
+        import asyncpg
+        
+        async def test_connection():
+            try:
+                conn = await asyncpg.connect(database_url)
+                await conn.close()
+                return True
+            except:
+                return False
+        
+        if asyncio.run(test_connection()):
+            print("✅ PostgreSQL database connected")
+            return True
+        else:
+            print("❌ Database connection failed. Run: python database/setup.py")
+            return False
+    except Exception:
+        print("⚠️  Database connection test skipped (dependencies not installed)")
+        return True  # Allow to proceed if async dependencies aren't installed yet
+
 def install_node_dependencies():
     """Install Node.js dependencies if needed"""
     if not Path("node_modules").exists():
@@ -222,6 +257,11 @@ def main():
         return
     
     print("🔧 Setting up AgentCraft React + FastAPI stack...")
+    
+    # Check database setup
+    if not check_database_setup():
+        print("❌ Database not configured. Please set up PostgreSQL first.")
+        return
     
     # Install dependencies
     if not install_node_dependencies():
