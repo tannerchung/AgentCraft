@@ -1,0 +1,89 @@
+AgentForce Technical Architect Panel Presentation
+Brief
+Overview
+This presentation is your opportunity to demonstrate your ability to quickly learn a new,
+non-Salesforce AI agent framework, build a functional solution with it, and clearly articulate the
+technical and business value of your solution. The panel may include people who are unfamiliar
+with your work, so make sure to introduce yourself and your AI experience.
+Presentation Structure
+1. Introduction (5 minutes)
+●
+Who Are You?
+○
+Briefly introduce your professional background, emphasizing relevant career
+highlights and specific experience with AI.
+○
+What unique perspectives or approaches do you bring to AI development?
+1. Main Presentation (45 minutes)
+●
+Learning Process & Technical Discovery
+○
+Introduce the AI agent framework you chose to explore.
+○
+Share your learning journey: key takeaways, challenges you encountered, and
+how you overcame them.
+●
+Functional AI Agent Demonstration
+○
+Provide a live demonstration of a fully interactive AI agent that the panelists can
+engage with.
+○
+Ensure your agent can store knowledge, interact with external tools, and
+implement a retrieval augmented generation (RAG) concept.
+○
+Present a clear and well-labeled architecture diagram that explains the overall
+solution and how the components interact.
+●
+Competitive Comparison & Value Proposition
+○
+Explain how your approach and solution are superior to Salesforce's
+methodology.
+○
+Clearly articulate the value proposition of your solution, emphasizing its
+production-readiness, scalability, and use of unique technologies.
+●
+Interactivity
+○
+Maintain audience engagement throughout the presentation with interactive
+elements, live demos, and opportunities for questions.
+1. Q&A and Wrap-Up (10 minutes)
+○
+Open the floor for questions and feedback.
+○
+Conclude with clear next steps.
+Evaluation Criteria
+●
+●
+●
+●
+Technical Depth:
+○
+Demonstrate a strong understanding of AI concepts, agent development,
+knowledge storage, tool integrations, and overall system architecture.
+Communication & Teaching:
+○
+Present information clearly and engagingly for both technical and non-technical
+audiences.
+○
+Effectively convey your learning journey and thought process.
+Business Value:
+○
+Clearly articulate your solution's use case, competitive advantage over
+Salesforce's approach, ROI, and scalability.
+Innovation & Ecosystem Knowledge:
+○
+Showcase creative approaches, leverage unique technologies, and integrate
+insights from existing customer experiences or new market trends.
+Extra Credit
+●
+●
+●
+Earn extra points for incorporating innovative or unique technologies.
+Demonstrate experience with existing customer challenges or novel approaches.
+Advanced features such as multi-agent collaboration, dynamic adaptation, or novel
+integration patterns will be highly regarded.
+Key Points to Remember
+This brief is your roadmap: start with your background, dive deep into your learning and
+development process with a live, interactive demo, and wrap up with a compelling competitive
+comparison. Let your personality and technical expertise shine through. Good luck with your
+presentation!
