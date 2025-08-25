@@ -159,7 +159,7 @@ const MessageContent = ({ content }) => {
         tr: ({ children }) => <tr>{children}</tr>,
         th: ({ children }) => <th className="px-3 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">{children}</th>,
         td: ({ children }) => <td className="px-3 py-2 text-sm text-gray-900">{children}</td>,
-        }}
+      }}
       >
         {processedContent}
       </ReactMarkdown>
@@ -1605,7 +1605,7 @@ const MultiAgentDemo = () => {
             )}
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
