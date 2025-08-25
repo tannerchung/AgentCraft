@@ -26,10 +26,15 @@ const KnowledgeBaseManager = () => {
   const loadKnowledgeStatus = async () => {
     try {
       const response = await fetch('http://localhost:8000/api/knowledge/knowledge-base/status');
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
       const data = await response.json();
       setKnowledgeStatus(data);
     } catch (error) {
       console.error('Error loading knowledge status:', error);
+      // Set to null to indicate error state
+      setKnowledgeStatus(null);
     }
   };
 
@@ -212,7 +217,7 @@ const KnowledgeBaseManager = () => {
               Vector Database Status
             </h3>
             
-            {knowledgeStatus ? (
+            {knowledgeStatus && knowledgeStatus.status ? (
               <div className="space-y-3">
                 <div className="flex justify-between">
                   <span>Qdrant Service:</span>
@@ -245,6 +250,14 @@ const KnowledgeBaseManager = () => {
                   <RefreshCw className="h-4 w-4 mr-2" />
                   Rebuild Knowledge Base
                 </button>
+              </div>
+            ) : knowledgeStatus === null ? (
+              <div className="text-center py-4">
+                <div className="text-red-600 mb-2">❌ Backend Service Unavailable</div>
+                <div className="text-sm text-gray-600">
+                  Please ensure the backend is running:
+                  <code className="block mt-1 text-xs bg-gray-100 p-1 rounded">cd backend && python main.py</code>
+                </div>
               </div>
             ) : (
               <div className="text-gray-500">Loading status...</div>
