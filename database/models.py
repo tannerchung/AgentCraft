@@ -14,6 +14,34 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+class DatabaseManager:
+    """Manages PostgreSQL database connections and operations"""
+    
+    def __init__(self):
+        self.pool = None
+        self.database_url = os.getenv('DATABASE_URL', 
+                                     'postgresql://agentcraft:agentcraft@localhost:5432/agentcraft')
+    
+    async def initialize(self):
+        """Initialize database connection pool"""
+        try:
+            self.pool = await asyncpg.create_pool(
+                self.database_url,
+                min_size=2,
+                max_size=10,
+                command_timeout=60
+            )
+            logger.info("Database pool initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize database: {e}")
+            raise
+    
+    async def close(self):
+        """Close database connections"""
+        if self.pool:
+            await self.pool.close()
+            logger.info("Database pool closed")
+
 class KnowledgeManager:
     """Manages companies and their knowledge base configurations"""
     
@@ -131,34 +159,6 @@ class KnowledgeManager:
             """, company_name)
         logger.info(f"Set current company to: {company_name}")
         return True
-
-class DatabaseManager:
-    """Manages PostgreSQL database connections and operations"""
-    
-    def __init__(self):
-        self.pool = None
-        self.database_url = os.getenv('DATABASE_URL', 
-                                     'postgresql://agentcraft:agentcraft@localhost:5432/agentcraft')
-    
-    async def initialize(self):
-        """Initialize database connection pool"""
-        try:
-            self.pool = await asyncpg.create_pool(
-                self.database_url,
-                min_size=2,
-                max_size=10,
-                command_timeout=60
-            )
-            logger.info("Database pool initialized successfully")
-        except Exception as e:
-            logger.error(f"Failed to initialize database: {e}")
-            raise
-    
-    async def close(self):
-        """Close database connections"""
-        if self.pool:
-            await self.pool.close()
-            logger.info("Database pool closed")
 
 class AgentManager:
     """Manages agent configurations in the database"""

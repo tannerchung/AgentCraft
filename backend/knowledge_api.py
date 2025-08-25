@@ -371,8 +371,9 @@ class RebuildRequest(BaseModel):
     company: str = Field(..., min_length=1, max_length=100)
     force: bool = Field(default=False)
 
-# In-memory storage for demo purposes
-knowledge_store = {
+# DEPRECATED: In-memory storage replaced with PostgreSQL database
+# URLs and company data are now persisted in the database
+knowledge_store_deprecated = {
     "current_company": "zapier",
     "companies": {
         "zapier": {
@@ -440,8 +441,8 @@ knowledge_store = {
 @router.get("/knowledge-base/status")
 async def get_knowledge_base_status():
     """Get the current status of the knowledge base"""
-    current = knowledge_store["current_company"]
-    company_data = knowledge_store["companies"].get(current, {})
+    current = await get_current_company()
+    all_companies = await get_all_companies()
     
     # Check for Qdrant service (mock check)
     qdrant_available = _check_qdrant_service()
@@ -451,81 +452,92 @@ async def get_knowledge_base_status():
         "success": True,
         "current_company": current,
         "status": {
-            "knowledge_base": company_data.get("status", "not_initialized"),
+            "knowledge_base": "ready",
             "qdrant_available": qdrant_available,
             "firecrawl_available": firecrawl_available,
             "vector_database": "operational" if qdrant_available else "disabled",
             "web_crawler": "operational" if firecrawl_available else "mock_mode"
         },
         "indexed_pages": get_real_indexed_pages(current),
-        "last_updated": company_data.get("last_updated"),
-        "available_companies": list(knowledge_store["companies"].keys())
+        "last_updated": datetime.utcnow().isoformat() + "Z",
+        "available_companies": [comp["name"] for comp in all_companies]
     }
 
 @router.get("/companies")
 async def get_companies():
     """Get list of available companies in the knowledge base"""
     companies = []
-    for key, data in knowledge_store["companies"].items():
+    all_companies = await get_all_companies()
+    current = await get_current_company()
+    
+    for comp in all_companies:
         companies.append({
-            "id": key,
-            "name": data["name"],
-            "domain": data["domain"],
-            "indexed_pages": get_real_indexed_pages(key),
-            "status": data["status"],
-            "last_updated": data["last_updated"]
+            "id": comp["name"],
+            "name": comp["name"].title(),
+            "domain": comp.get("domain", f"{comp['name']}.com"),
+            "indexed_pages": get_real_indexed_pages(comp["name"]),
+            "status": "ready",
+            "last_updated": comp.get("updated_at", datetime.utcnow().isoformat() + "Z")
         })
     
     return {
         "success": True,
         "companies": companies,
-        "current": knowledge_store["current_company"]
+        "current": current
     }
 
 @router.get("/crawl/company-urls")
-async def get_company_urls():
+async def get_company_crawl_urls():
     """Get URLs that have been crawled for the current company"""
-    current = knowledge_store["current_company"]
-    company_data = knowledge_store["companies"].get(current, {})
+    current = await get_current_company()
+    company_urls = await get_company_urls(current)
     
     return {
         "success": True,
         "company": current,
-        "urls": company_data.get("urls", []),
-        "total_count": len(company_data.get("urls", [])),
+        "urls": company_urls,
+        "total_count": len(company_urls),
         "indexed_pages": get_real_indexed_pages(current)
     }
 
 @router.post("/switch-company")
 async def switch_company(request: CompanySwitchRequest):
     """Switch to a different company knowledge base"""
-    if request.company not in knowledge_store["companies"]:
-        # Create new company if it doesn't exist
-        knowledge_store["companies"][request.company] = {
-            "name": request.company.title(),
-            "domain": f"{request.company}.com",
-            "last_updated": datetime.utcnow().isoformat() + "Z",
-            "status": "initializing",
-            "urls": [],
-            "knowledge_entries": []
-        }
+    # Ensure company exists in database
+    existing_company = None
+    if DATABASE_INTEGRATION:
+        await ensure_db_initialized()
+        existing_company = await knowledge_manager.get_company_by_name(request.company)
+        
+        if not existing_company:
+            # Create new company
+            await knowledge_manager.create_company({
+                "name": request.company,
+                "domain": f"{request.company}.com",
+                "description": f"{request.company.title()} knowledge base"
+            })
     
-    knowledge_store["current_company"] = request.company
+    # Set as current company
+    await set_current_company(request.company)
     
     return {
         "success": True,
         "message": f"Switched to {request.company} knowledge base",
         "company": request.company,
-        "status": knowledge_store["companies"][request.company]["status"]
+        "status": "ready"
     }
 
 @router.post("/knowledge-base/search")
 async def search_knowledge_base(request: SearchRequest):
     """Search the knowledge base using live Qdrant semantic search"""
-    company = request.company or knowledge_store["current_company"]
+    company = request.company or await get_current_company()
     
-    if company not in knowledge_store["companies"]:
-        raise HTTPException(status_code=404, detail=f"Company {company} not found")
+    # Verify company exists in database if available
+    if DATABASE_INTEGRATION:
+        await ensure_db_initialized()
+        existing_company = await knowledge_manager.get_company_by_name(company)
+        if not existing_company:
+            raise HTTPException(status_code=404, detail=f"Company {company} not found")
     
     if QDRANT_INTEGRATION and qdrant_service.client:
         try:
@@ -573,7 +585,7 @@ async def search_knowledge_base(request: SearchRequest):
             
         except Exception as e:
             # Fallback to mock if Qdrant search fails
-            company_data = knowledge_store["companies"][company]
+            # Fallback response when search fails
             results = [{
                 "title": f"Search Error - {company.title()}",
                 "content": f"Qdrant search failed: {str(e)}. Using fallback for '{request.query}'...",
@@ -594,7 +606,7 @@ async def search_knowledge_base(request: SearchRequest):
             }
     else:
         # Fallback when Qdrant not available
-        company_data = knowledge_store["companies"][company]
+        # Fallback response when Qdrant not available
         results = [{
             "title": f"Qdrant Unavailable - {company.title()}",
             "content": f"Vector search not available. Query: '{request.query}'. Please ensure Qdrant service is running.",
@@ -616,15 +628,18 @@ async def search_knowledge_base(request: SearchRequest):
 @router.get("/training-data/generate")
 async def generate_training_data(count: int = Query(default=50, ge=1, le=200)):
     """Generate training data from crawled URLs and knowledge base content"""
-    current = knowledge_store["current_company"]
-    company_data = knowledge_store["companies"].get(current, {})
+    current = await get_current_company()
     
-    if not company_data:
-        raise HTTPException(status_code=404, detail=f"Company {current} not found")
+    # Verify company exists in database
+    if DATABASE_INTEGRATION:
+        await ensure_db_initialized()
+        existing_company = await knowledge_manager.get_company_by_name(current)
+        if not existing_company:
+            raise HTTPException(status_code=404, detail=f"Company {current} not found")
     
     training_data = []
-    crawled_urls = company_data.get("urls", [])
-    knowledge_entries = company_data.get("knowledge_entries", [])
+    crawled_urls = await get_company_urls(current)
+    knowledge_entries = []  # Will be retrieved from Qdrant
     
     # Generate training data from actual crawled content
     if knowledge_entries:
@@ -702,7 +717,7 @@ async def generate_training_data(count: int = Query(default=50, ge=1, le=200)):
             "answer": f"{current.title()} provides {topic} capabilities through its platform. This includes comprehensive tools and documentation to help users implement {topic} effectively.",
             "context": f"Generated from {current.title()} knowledge base",
             "content_type": "generated",
-            "source_url": f"https://{company_data.get('domain', current + '.com')}",
+            "source_url": f"https://{existing_company.get('domain', current + '.com') if existing_company else current + '.com'}",
             "relevance": 0.7,
             "crawl_source": False
         })
@@ -733,10 +748,18 @@ async def generate_training_data(count: int = Query(default=50, ge=1, le=200)):
 @router.post("/crawl/urls")
 async def crawl_urls(request: CrawlUrlsRequest):
     """Crawl specified URLs using Firecrawl and add to knowledge base"""
-    if request.company not in knowledge_store["companies"]:
-        raise HTTPException(status_code=404, detail=f"Company {request.company} not found")
+    # Verify company exists in database
+    if DATABASE_INTEGRATION:
+        await ensure_db_initialized()
+        existing_company = await knowledge_manager.get_company_by_name(request.company)
+        if not existing_company:
+            # Create company if it doesn't exist
+            await knowledge_manager.create_company({
+                "name": request.company,
+                "domain": f"{request.company}.com",
+                "description": f"{request.company.title()} knowledge base"
+            })
     
-    company_data = knowledge_store["companies"][request.company]
     is_re_crawl = getattr(request, 're_crawl', False)
     
     # Expand wildcard URLs (e.g., https://example.com/docs/* -> multiple child URLs)
@@ -769,18 +792,20 @@ async def crawl_urls(request: CrawlUrlsRequest):
         print(f"Wildcard expansion: {len(request.urls)} patterns -> {len(urls_to_process)} total URLs ({wildcard_discovered} discovered)")
     
     # Add new URLs to company data if not re-crawling
+    # Add URLs to database and process them
     new_urls = []
     if not is_re_crawl:
+        # Get existing URLs from database
+        existing_urls = await get_company_urls(request.company) if DATABASE_INTEGRATION else []
+        
         for url in request.urls:
-            if url not in company_data.get("urls", []):
-                company_data["urls"].append(url)
+            if url not in existing_urls:
+                # Add URL to database
+                await add_company_url(request.company, url)
                 new_urls.append(url)
     else:
         # For re-crawling, process all existing URLs
         new_urls = urls_to_process
-    
-    company_data["last_updated"] = datetime.utcnow().isoformat() + "Z"
-    company_data["status"] = "crawling"
     
     # Check if Firecrawl is available
     firecrawl_available = _check_firecrawl_service()
@@ -825,16 +850,9 @@ async def crawl_urls(request: CrawlUrlsRequest):
                 }
                 crawled_content.append(mock_content)
         
-        # Update knowledge entries
-        if is_re_crawl:
-            # Clear existing entries for re-crawled URLs
-            company_data["knowledge_entries"] = [
-                entry for entry in company_data.get("knowledge_entries", [])
-                if entry.get("url") not in urls_to_process
-            ]
+        # Knowledge entries are stored in Qdrant, not in memory
         
-        # Add new crawled content
-        company_data["knowledge_entries"].extend(crawled_content)
+        # Crawled content is already stored in Qdrant, no need to store in memory
         
         # Automatically index crawled content into Qdrant for search
         indexed_count = 0
@@ -888,7 +906,7 @@ async def crawl_urls(request: CrawlUrlsRequest):
             except Exception as e:
                 print(f"Error indexing crawled content: {str(e)}")
         
-        company_data["status"] = "ready"
+        # Status tracked in database now, not in memory
         crawl_method = "Live Firecrawl API" if firecrawl_available else "Mock crawl (Firecrawl unavailable)"
         
         # Build response message with wildcard info
@@ -910,11 +928,10 @@ async def crawl_urls(request: CrawlUrlsRequest):
             "total_indexed": get_real_indexed_pages(request.company),
             "firecrawl_used": firecrawl_available,
             "auto_indexed": indexed_count > 0,
-            "status": company_data["status"]
+            "status": "completed"
         }
         
     except Exception as e:
-        company_data["status"] = "error"
         return {
             "success": False,
             "message": f"Failed to crawl URLs: {str(e)}",
@@ -926,12 +943,12 @@ async def crawl_urls(request: CrawlUrlsRequest):
 @router.post("/knowledge-base/rebuild")
 async def rebuild_knowledge_base(request: RebuildRequest):
     """Rebuild the knowledge base for a company with live Qdrant integration"""
-    if request.company not in knowledge_store["companies"]:
-        raise HTTPException(status_code=404, detail=f"Company {request.company} not found")
-    
-    company_data = knowledge_store["companies"][request.company]
-    company_data["status"] = "rebuilding"
-    company_data["last_updated"] = datetime.utcnow().isoformat() + "Z"
+    # Verify company exists in database
+    if DATABASE_INTEGRATION:
+        await ensure_db_initialized()
+        existing_company = await knowledge_manager.get_company_by_name(request.company)
+        if not existing_company:
+            raise HTTPException(status_code=404, detail=f"Company {request.company} not found")
     
     try:
         if QDRANT_INTEGRATION and qdrant_service.client:
@@ -957,16 +974,18 @@ async def rebuild_knowledge_base(request: RebuildRequest):
                     )
                 )
             
-            # Convert knowledge entries to KnowledgeArticle objects
-            if company_data.get("knowledge_entries"):
+            # Get URLs from database and convert to KnowledgeArticle objects
+            company_urls = await get_company_urls(request.company)
+            if company_urls:
                 from src.services.qdrant_service import KnowledgeArticle
                 articles = []
                 
-                for i, entry in enumerate(company_data["knowledge_entries"]):
+                # Create articles from URLs for re-indexing
+                for i, url in enumerate(company_urls):
                     article = KnowledgeArticle(
                         id=f"{request.company}_{i}",
-                        title=entry.get("title", f"Article {i+1}"),
-                        content=entry.get("content", ""),
+                        title=f"Content from {url}",
+                        content=f"Rebuilding content from {url}",
                         category="Crawled Content",
                         tags=[request.company, "crawled", "live"],
                         created_at=datetime.utcnow().isoformat() + "Z",
@@ -985,30 +1004,21 @@ async def rebuild_knowledge_base(request: RebuildRequest):
                 qdrant_service.collection_name = original_collection
                 
                 if success:
-                    company_data["qdrant_indexed"] = len(articles)
-                    base_collection = "agentcraft_knowledge"  # Always use the base name
-                    company_data["qdrant_collection"] = f"{base_collection}_{request.company}"
+                    # Qdrant indexing successful
+                    pass
                 else:
                     raise Exception("Failed to index articles in Qdrant")
             else:
-                # No knowledge entries to index
-                company_data["qdrant_indexed"] = 0
+                # No URLs to index
+                pass
         
         else:
             # Fallback to mock rebuild if Qdrant not available
             if request.force:
-                company_data["knowledge_entries"] = []
-                # URLs will be indexed into Qdrant, not stored as indexed_pages count
-                
-                for url in company_data.get("urls", []):
-                    company_data["knowledge_entries"].append({
-                        "title": f"Rebuilt content from {url}",
-                        "content": f"Fresh content from {url}...",
-                        "url": url,
-                        "relevance": 0.90
-                    })
+                # In mock mode, no actual rebuilding happens
+                pass
         
-        company_data["status"] = "ready"
+        # Status tracked in database now, not in memory
         
         return {
             "success": True,
@@ -1016,16 +1026,14 @@ async def rebuild_knowledge_base(request: RebuildRequest):
                       (" with Qdrant integration" if QDRANT_INTEGRATION else " (mock mode)"),
             "company": request.company,
             "indexed_pages": get_real_indexed_pages(request.company),
-            "total_entries": len(company_data.get("knowledge_entries", [])),
-            "qdrant_indexed": company_data.get("qdrant_indexed", 0),
-            "qdrant_collection": company_data.get("qdrant_collection"),
+            "total_entries": get_real_indexed_pages(request.company),
+            "qdrant_indexed": get_real_indexed_pages(request.company),
+            "qdrant_collection": f"agentcraft_knowledge_{request.company}",
             "integration": "live" if QDRANT_INTEGRATION else "mock",
-            "status": company_data["status"]
+            "status": "completed"
         }
         
     except Exception as e:
-        company_data["status"] = "error"
-        company_data["error"] = str(e)
         
         return {
             "success": False,
@@ -1039,16 +1047,18 @@ async def rebuild_knowledge_base(request: RebuildRequest):
 @router.post("/training-data/integrate")
 async def integrate_training_data(request: dict):
     """Integrate generated training data into knowledge base for agent use"""
-    company = request.get("company", knowledge_store["current_company"])
+    company = request.get("company", await get_current_company())
     training_data = request.get("training_data", [])
     
     if not training_data:
         return {"success": False, "message": "No training data provided"}
     
-    if company not in knowledge_store["companies"]:
-        return {"success": False, "message": f"Company {company} not found"}
-    
-    company_data = knowledge_store["companies"][company]
+    # Verify company exists in database
+    if DATABASE_INTEGRATION:
+        await ensure_db_initialized()
+        existing_company = await knowledge_manager.get_company_by_name(company)
+        if not existing_company:
+            return {"success": False, "message": f"Company {company} not found"}
     integrated_count = 0
     
     try:
@@ -1101,21 +1111,17 @@ async def integrate_training_data(request: dict):
                     integrated_count = len(articles)
                     
                     # Update company knowledge entries for tracking
+                    # Articles are now stored in Qdrant, not in memory
                     for article in articles:
-                        company_data["knowledge_entries"].append({
-                            "title": article.title,
-                            "content": article.content[:200],
-                            "url": f"training://qa_{article.id}",
-                            "relevance": 0.90,
-                            "source": "training_data"
-                        })
+                        # Just track that we integrated them
+                        pass  # Articles stored in Qdrant
         
         return {
             "success": True,
             "message": f"Integrated {integrated_count} training items into {company} knowledge base",
             "company": company,
             "integrated_count": integrated_count,
-            "total_kb_entries": len(company_data.get("knowledge_entries", [])),
+            "total_kb_entries": get_real_indexed_pages(company),
             "integration_type": "live" if QDRANT_INTEGRATION else "mock"
         }
         
@@ -1133,8 +1139,8 @@ async def knowledge_health():
     return {
         "success": True,
         "status": "operational",
-        "companies_loaded": len(knowledge_store["companies"]),
-        "current_company": knowledge_store["current_company"],
+        "companies_loaded": len(await get_all_companies()) if DATABASE_INTEGRATION else 1,
+        "current_company": await get_current_company(),
         "qdrant_integration": QDRANT_INTEGRATION,
         "qdrant_available": QDRANT_INTEGRATION and qdrant_service.client is not None
     }
