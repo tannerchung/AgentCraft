@@ -176,6 +176,26 @@ async def hot_reload_agent(agent_id: str, backend = Depends(get_enhanced_backend
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.get("/{agent_id}/metrics")
+async def get_agent_metrics(agent_id: str, backend = Depends(get_enhanced_backend)):
+    """Get performance metrics for a specific agent"""
+    try:
+        # Validate UUID format
+        UUID(agent_id)
+        
+        # Get metrics from database
+        result = await backend.get_agent_performance_metrics(agent_id)
+        
+        if result.get("success"):
+            return result
+        else:
+            raise HTTPException(status_code=404, detail=result.get("error", "Agent not found"))
+    
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid agent ID format")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.get("/status")
 async def get_agent_status(backend = Depends(get_enhanced_backend)):
     """Get agent system status"""

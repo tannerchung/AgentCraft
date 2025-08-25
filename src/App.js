@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import Dashboard from './components/Dashboard';
 import EnhancedDashboard from './components/EnhancedDashboard';
@@ -6,7 +5,8 @@ import ABTestingDashboard from './components/ABTestingDashboard';
 import AgentChat from './components/AgentChat';
 import MultiAgentDemo from './components/MultiAgentDemo';
 import AgentConfiguration from './components/AgentConfiguration';
-import { Activity, MessageSquare, Users, BarChart3, Zap, Settings } from 'lucide-react';
+import KnowledgeBaseManager from './components/KnowledgeBaseManager';
+import { Activity, MessageSquare, Users, BarChart3, Zap, Settings, Database } from 'lucide-react';
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -17,7 +17,8 @@ function App() {
     { id: 'ab-testing', name: 'A/B Testing', icon: Zap },
     { id: 'chat', name: 'Agent Chat', icon: MessageSquare },
     { id: 'multi-agent', name: 'Multi-Agent Demo', icon: Users },
-    { id: 'agent-config', name: 'Agent Configuration', icon: Settings },
+    { id: 'knowledge', name: 'Knowledge Base', icon: Database },
+    { id: 'config', name: 'Agent Configuration', icon: Settings },
   ];
 
   const renderActiveComponent = () => {
@@ -32,7 +33,9 @@ function App() {
         return <AgentChat />;
       case 'multi-agent':
         return <MultiAgentDemo />;
-      case 'agent-config':
+      case 'knowledge':
+        return <KnowledgeBaseManager />;
+      case 'config':
         return <AgentConfiguration />;
       default:
         return <Dashboard />;

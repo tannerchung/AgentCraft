@@ -17,15 +17,26 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
+# Import necessary routers from the backend
+try:
+    from backend.efficiency_api import router as efficiency_router
+    from backend.agent_management_api import router as agent_router
+    from backend.websocket_api import router as websocket_router
+    from backend.knowledge_api import router as knowledge_router  # Import knowledge router
+    BACKEND_IMPORTS_SUCCESSFUL = True
+except ImportError as e:
+    logging.warning(f"Failed to import backend modules: {e}. Some API routes may be unavailable.")
+    BACKEND_IMPORTS_SUCCESSFUL = False
+
 def convert_technical_to_customer_friendly(technical_analysis: Dict[str, Any], query: str) -> str:
     """Convert technical analysis to natural customer service response with actionable solutions"""
-    
+
     # Handle different types of technical responses
     if "diagnosis" in technical_analysis:
         # Webhook/technical issue response with specific solution steps
         solution_steps = technical_analysis.get('implementation_steps', [])
         working_code = technical_analysis.get('working_code', '')
-        
+
         response = f"""I've identified the issue you're experiencing - {technical_analysis.get('diagnosis', 'there appears to be a configuration problem with your integration')}.
 
 Here's how to resolve this:
@@ -45,19 +56,19 @@ Here's how to resolve this:
             response += f"\n\n**Code example to help:**\n```\n{working_code.strip()}\n```"
 
         response += f"\n\n**Expected resolution time:** {technical_analysis.get('estimated_fix_time', '15-30 minutes')}"
-        
+
         testing_approach = technical_analysis.get('testing_approach', '')
         if testing_approach:
             response += f"\n\n**To verify it's working:** {testing_approach}"
-        
+
         response += "\n\nTry these steps and let me know if you need any clarification or run into issues. I'm here to help you get this resolved!"
-        
+
         return response
 
     elif "competitor_analysis" in technical_analysis or "competitive_intelligence" in technical_analysis:
         # Competitive analysis response with specific comparisons
         comp_data = technical_analysis.get("competitor_analysis", technical_analysis.get("competitive_intelligence", {}))
-        
+
         return f"""Great question! Here's how we compare to other platforms in the market:
 
 **Cost Savings:** 
@@ -88,7 +99,7 @@ Would you like me to set up a quick technical demo so you can see exactly how th
     else:
         # General customer service response with actionable solutions
         ai_content = technical_analysis.get("ai_analysis", str(technical_analysis))
-        
+
         # Extract key points from AI content and make it customer-friendly
         if "webhook" in query.lower() or "api" in query.lower():
             return """I can help you resolve this API/webhook integration issue. Here are the most common solutions that work in 90% of cases:
@@ -180,9 +191,9 @@ if galileo_api_key:
         os.environ['GALILEO_API_KEY'] = galileo_api_key
         os.environ['GALILEO_PROJECT'] = os.getenv('GALILEO_PROJECT', 'AgentCraft')
         os.environ['GALILEO_LOG_STREAM'] = os.getenv('GALILEO_LOG_STREAM', 'development')
-        
+
         from galileo import GalileoLogger
-        
+
         # Initialize Galileo logger
         galileo_logger = GalileoLogger()
         GALILEO_AVAILABLE = True
@@ -234,89 +245,90 @@ async def lifespan(app: FastAPI):
     if GALILEO_AVAILABLE:
         # Galileo is already initialized globally
         logging.info("🔭 Galileo observability ready for tracing")
-    
+
     if AGENTCRAFT_AVAILABLE:
         logging.info("AgentCraft system initialized successfully with enhanced technical support agent")
     else:
         logging.info("Running in demo mode with mock responses")
-    
+
     yield
-    
+
     # Shutdown
     logging.info("AgentCraft system shutting down")
 
 app = FastAPI(title="AgentCraft API", version="1.0.0", lifespan=lifespan)
 
 # Include enhanced API routes if enhanced backend is available
-if ENHANCED_BACKEND_AVAILABLE:
+if BACKEND_IMPORTS_SUCCESSFUL:
     try:
-        from backend.agent_management_api import router as agent_router
-        from backend.efficiency_api import router as efficiency_router
-        
-        app.include_router(agent_router)
-        app.include_router(efficiency_router)
-        
-        # Import WebSocket functionality and router
-        from backend.websocket_api import router as websocket_router, ws_manager, handle_client_message
-        app.include_router(websocket_router)
-        
-        logging.info("Enhanced API routes loaded: agent management, efficiency, WebSocket")
-    except ImportError as e:
-        logging.warning(f"Could not load enhanced API routes: {e}")
+        app.include_router(agent_router, prefix="/api/agents")
+        app.include_router(efficiency_router, prefix="/api/efficiency")
+        app.include_router(websocket_router, prefix="/api/ws")
+        app.include_router(knowledge_router, prefix="/api/knowledge")  # Register knowledge router
+
+        logging.info("Enhanced API routes loaded: agent management, efficiency, WebSocket, knowledge")
+    except Exception as e:
+        logging.warning(f"Could not load all enhanced API routes: {e}")
 
 # WebSocket endpoint - defined directly on app to avoid router issues
-if ENHANCED_BACKEND_AVAILABLE:
-    logging.info("Registering WebSocket endpoint at /api/ws/agent-tracking/{client_id}")
-    
-    @app.websocket("/api/ws/agent-tracking/{client_id}")
-    async def websocket_agent_tracking(websocket: WebSocket, client_id: str):
-        """WebSocket endpoint for real-time agent tracking"""
-        logging.info(f"WebSocket connection attempt from {client_id}")
-        await ws_manager.connect(websocket, client_id)
-        
-        try:
-            while True:
-                # Keep connection alive and handle client messages
-                try:
-                    data = await asyncio.wait_for(websocket.receive_text(), timeout=30.0)
-                    message = json.loads(data)
-                    
-                    # Handle client commands
-                    await handle_client_message(message, client_id)
-                    
-                except asyncio.TimeoutError:
-                    # Send ping to keep connection alive
-                    ping_message = {
-                        "type": "ping",
-                        "timestamp": asyncio.get_event_loop().time()
-                    }
-                    await ws_manager.send_personal_message(ping_message, client_id)
-                    
-        except WebSocketDisconnect:
-            await ws_manager.disconnect(client_id)
-        except Exception as e:
-            logging.error(f"WebSocket error for {client_id}: {e}")
-            await ws_manager.disconnect(client_id)
+if BACKEND_IMPORTS_SUCCESSFUL:
+    try:
+        from backend.websocket_api import ws_manager, handle_client_message
 
-    # WebSocket management REST endpoints
-    @app.get("/api/ws/stats")
-    async def get_websocket_stats():
-        """Get WebSocket connection statistics"""
-        from src.agents.realtime_agent_tracker import realtime_tracker
-        return {
-            "success": True,
-            "stats": ws_manager.get_connection_stats(),
-            "realtime_sessions": realtime_tracker.get_active_sessions_summary()
-        }
+        logging.info("Registering WebSocket endpoint at /api/ws/agent-tracking/{client_id}")
 
-    @app.post("/api/ws/broadcast")
-    async def broadcast_message(message: dict):
-        """Broadcast message to all connected WebSocket clients"""
-        try:
-            await ws_manager.broadcast(message)
-            return {"success": True, "message": "Broadcast sent"}
-        except Exception as e:
-            return {"success": False, "error": str(e)}
+        @app.websocket("/api/ws/agent-tracking/{client_id}")
+        async def websocket_agent_tracking(websocket: WebSocket, client_id: str):
+            """WebSocket endpoint for real-time agent tracking"""
+            logging.info(f"WebSocket connection attempt from {client_id}")
+            await ws_manager.connect(websocket, client_id)
+
+            try:
+                while True:
+                    # Keep connection alive and handle client messages
+                    try:
+                        data = await asyncio.wait_for(websocket.receive_text(), timeout=30.0)
+                        message = json.loads(data)
+
+                        # Handle client commands
+                        await handle_client_message(message, client_id)
+
+                    except asyncio.TimeoutError:
+                        # Send ping to keep connection alive
+                        ping_message = {
+                            "type": "ping",
+                            "timestamp": asyncio.get_event_loop().time()
+                        }
+                        await ws_manager.send_personal_message(ping_message, client_id)
+
+            except WebSocketDisconnect:
+                await ws_manager.disconnect(client_id)
+            except Exception as e:
+                logging.error(f"WebSocket error for {client_id}: {e}")
+                await ws_manager.disconnect(client_id)
+
+        # WebSocket management REST endpoints
+        @app.get("/api/ws/stats")
+        async def get_websocket_stats():
+            """Get WebSocket connection statistics"""
+            from src.agents.realtime_agent_tracker import realtime_tracker
+            return {
+                "success": True,
+                "stats": ws_manager.get_connection_stats(),
+                "realtime_sessions": realtime_tracker.get_active_sessions_summary()
+            }
+
+        @app.post("/api/ws/broadcast")
+        async def broadcast_message(message: dict):
+            """Broadcast message to all connected WebSocket clients"""
+            try:
+                await ws_manager.broadcast(message)
+                return {"success": True, "message": "Broadcast sent"}
+            except Exception as e:
+                return {"success": False, "error": str(e)}
+    except ImportError as e:
+        logging.warning(f"Could not set up WebSocket endpoint: {e}")
+
 
 # CORS middleware for React frontend
 app.add_middleware(
@@ -355,9 +367,9 @@ async def lifespan(app: FastAPI):
         logging.info("AgentCraft system initialized successfully with enhanced technical support agent")
     else:
         logging.info("Running in demo mode with mock responses")
-    
+
     yield
-    
+
     # Shutdown - cleanup if needed
     logging.info("AgentCraft system shutting down")
 
@@ -373,7 +385,7 @@ async def root():
 @app.post("/api/chat")
 async def chat_with_real_ai_agent(request: ChatMessage):
     """Real AI agent chat endpoint using Claude/CrewAI"""
-    
+
     # Start Galileo trace if available
     trace_id = None
     if GALILEO_AVAILABLE and galileo_logger:
@@ -389,7 +401,7 @@ async def chat_with_real_ai_agent(request: ChatMessage):
             logging.info(f"🔭 Galileo trace started: {trace_id}")
         except Exception as e:
             logging.warning(f"Failed to start Galileo trace: {e}")
-    
+
     try:
         if ENHANCED_BACKEND_AVAILABLE:
             # Use enhanced database-backed backend
@@ -398,7 +410,7 @@ async def chat_with_real_ai_agent(request: ChatMessage):
                 agent_type=request.agent_type,
                 context=request.context
             )
-            
+
             # Log to Galileo if available
             if GALILEO_AVAILABLE and galileo_logger and trace_id:
                 try:
@@ -411,9 +423,9 @@ async def chat_with_real_ai_agent(request: ChatMessage):
                     logging.info(f"🔭 Galileo trace logged for enhanced backend")
                 except Exception as e:
                     logging.warning(f"Failed to log enhanced backend to Galileo: {e}")
-            
+
             return result
-            
+
         elif AGENTCRAFT_AVAILABLE and AI_POWERED:
             # Fallback to original AI agent
             # Check if CrewAI orchestration is requested
@@ -421,7 +433,7 @@ async def chat_with_real_ai_agent(request: ChatMessage):
             if context.get('use_crewai', False):
                 # Enable orchestration mode for proper multi-agent CrewAI processing
                 context['orchestration_mode'] = True
-            
+
             # Use the real AI agent (not templates)
             result = real_technical_agent.process_technical_query(
                 query=request.message,
@@ -435,7 +447,7 @@ async def chat_with_real_ai_agent(request: ChatMessage):
 
             # Use the raw AI response directly from CrewAI
             technical_data = result["technical_response"]
-            
+
             # Extract the actual AI response without converting it
             if technical_data.get('ai_analysis'):
                 # This is the raw CrewAI output
@@ -468,14 +480,14 @@ async def chat_with_real_ai_agent(request: ChatMessage):
                             "ai_confidence": result["query_analysis"].get("ai_confidence", "N/A")
                         }
                     )
-                    
+
                     # Conclude the trace
                     galileo_logger.conclude(output=result["response"]["content"])
                     galileo_logger.flush()  # Send to Galileo
                     logging.info(f"🔭 Galileo trace concluded and sent")
                 except Exception as e:
                     logging.warning(f"Failed to log to Galileo: {e}")
-            
+
             return {
                 "success": True,
                 "response": {
@@ -1008,6 +1020,26 @@ This analysis draws from my specialized competitive intelligence database and re
 
     return responses.get(agent_type, responses["technical"])
 
+# Utility function to call the correct agent or mock response
+async def chat_with_agent(request: ChatMessage):
+    """Determines which agent to use or if a mock response is needed"""
+    if AGENTCRAFT_AVAILABLE and AI_POWERED:
+        return await chat_with_real_ai_agent(request)
+    elif AGENTCRAFT_AVAILABLE:
+        # Fallback to template-based agents if AI is not powered
+        return await chat_with_real_ai_agent(request) # Reusing the same function for consistency
+    else:
+        # Fallback to mock responses
+        mock_response = get_mock_agent_response(request.agent_type, request.message)
+        return ChatResponse(
+            message=mock_response["message"],
+            confidence=mock_response["confidence"],
+            agent_used=request.agent_type,
+            timestamp=datetime.now().isoformat(),
+            processing_time=str(random.uniform(0.5, 1.5)) + " seconds"
+        )
+
+
 # Enhanced API endpoints for Qdrant, Galileo, and HITL
 
 @app.get("/api/qdrant-metrics")
@@ -1017,7 +1049,7 @@ async def get_qdrant_metrics():
         # In production, import and use actual Qdrant service
         # from src.services.qdrant_service import qdrant_service
         # return qdrant_service.get_metrics()
-        
+
         # Mock metrics for demo
         return {
             "status": "healthy",
@@ -1050,7 +1082,7 @@ async def get_galileo_metrics():
             # In production, you would retrieve real metrics from Galileo
             # This would be replaced with actual Galileo API calls
             logging.info("Retrieving real Galileo metrics")
-        
+
         # Enhanced Galileo metrics for demo with Galileo integration status
         return {
             "galileo_status": {
@@ -1102,7 +1134,7 @@ async def get_hitl_metrics():
         # In production, import and use actual HITL service
         # from src.services.hitl_service import hitl_service
         # return hitl_service.get_escalation_metrics()
-        
+
         # Mock HITL metrics for demo
         return {
             "total_escalations": 47,
@@ -1136,11 +1168,11 @@ async def vector_search(request: Dict[str, Any]):
     try:
         query = request.get("query", "")
         limit = request.get("limit", 5)
-        
+
         # In production, use actual Qdrant service
         # from src.services.qdrant_service import qdrant_service
         # results = qdrant_service.search(query, limit)
-        
+
         # Mock search results for demo
         mock_results = [
             {
@@ -1162,7 +1194,7 @@ async def vector_search(request: Dict[str, Any]):
                 "updated_at": "2024-08-20T15:00:00Z"
             }
         ]
-        
+
         return {
             "query": query,
             "results": mock_results[:limit],
@@ -1236,12 +1268,12 @@ async def get_adaptive_llm_metrics():
     """Get detailed metrics from the adaptive LLM system with Galileo integration"""
     try:
         from src.agents.adaptive_llm_system import adaptive_system
-        
+
         performance_summary = adaptive_system.llm_pool.get_performance_summary()
         optimization_insights = adaptive_system.generate_optimization_insights()
         collaboration_insights = adaptive_system.get_collaboration_insights()
         memory_insights = adaptive_system.get_memory_insights()
-        
+
         # Get Galileo insights if available
         galileo_insights = {}
         try:
@@ -1250,7 +1282,7 @@ async def get_adaptive_llm_metrics():
                 galileo_insights = galileo_integration.get_galileo_insights()
         except ImportError:
             galileo_insights = {"status": "not_available"}
-        
+
         return {
             "status": "active",
             "system_info": {
@@ -1281,13 +1313,13 @@ async def get_galileo_adaptive_dashboard():
     """Get comprehensive Galileo dashboard metrics for the adaptive system"""
     try:
         from src.agents.galileo_adaptive_integration import galileo_integration
-        
+
         if not galileo_integration:
             return {"status": "not_available", "error": "Galileo integration not initialized"}
-        
+
         dashboard_metrics = galileo_integration.create_adaptive_dashboard_metrics()
         return dashboard_metrics
-        
+
     except ImportError:
         return {
             "status": "not_available",
@@ -1304,7 +1336,7 @@ async def train_adaptive_system(training_data: List[Dict[str, Any]]):
     """Train the adaptive LLM system with feedback data"""
     try:
         from src.agents.adaptive_llm_system import adaptive_system
-        
+
         result = adaptive_system.train_system(training_data)
         return result
     except ImportError:
@@ -1323,7 +1355,7 @@ async def test_adaptive_system_endpoint(test_queries: List[Dict[str, Any]]):
     """Test the adaptive LLM system with provided queries"""
     try:
         from src.agents.adaptive_llm_system import adaptive_system
-        
+
         result = adaptive_system.test_system(test_queries)
         return result
     except ImportError:
