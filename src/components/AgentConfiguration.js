@@ -6,6 +6,378 @@ import {
 } from 'lucide-react';
 import QueryAnalyzer from './QueryAnalyzer';
 
+// Agent Creation Form Component
+const CreateAgentForm = ({ onCancel, onSave }) => {
+  const [formData, setFormData] = useState({
+    name: '',
+    description: '',
+    category: 'Technical',
+    avatar: '🤖',
+    keywords: '',
+    confidenceThreshold: 0.7,
+    maxResponseLength: 2000,
+    promptTemplate: 'You are a specialized AI agent. Provide helpful, accurate, and detailed responses within your domain of expertise.',
+    escalationRules: ['low_confidence', 'domain_mismatch'],
+    responseFormat: 'structured',
+    domain: '',
+    backstory: '',
+    goal: ''
+  });
+
+  const [errors, setErrors] = useState({});
+
+  const categories = ['Technical', 'Business', 'Analysis', 'Customer', 'Product', 'Industry'];
+  const availableAvatars = ['🤖', '🔧', '⚙️', '🛡️', '🗄️', '💳', '⚖️', '📈', '📢', '📊', '💰', '🎯', '🎓', '🚀', '🎨', '🏥', '🏦', '🛒', '☁️'];
+  const escalationOptions = ['low_confidence', 'domain_mismatch', 'complex_query', 'user_request'];
+
+  const validateForm = () => {
+    const newErrors = {};
+    
+    if (!formData.name.trim()) newErrors.name = 'Agent name is required';
+    if (!formData.description.trim()) newErrors.description = 'Description is required';
+    if (!formData.keywords.trim()) newErrors.keywords = 'At least one keyword is required';
+    if (!formData.domain.trim()) newErrors.domain = 'Domain is required';
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!validateForm()) return;
+
+    const keywordsList = formData.keywords.split(',').map(k => k.trim()).filter(k => k);
+    
+    const newAgent = {
+      id: `custom_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      name: formData.name,
+      description: formData.description,
+      avatar: formData.avatar,
+      category: formData.category,
+      status: 'draft',
+      lastModified: new Date().toISOString(),
+      performance: { 
+        successRate: 85, 
+        avgConfidence: 80, 
+        escalationRate: 5 
+      },
+      configuration: {
+        keywords: keywordsList,
+        confidenceThreshold: formData.confidenceThreshold,
+        escalationRules: formData.escalationRules,
+        responseFormat: formData.responseFormat,
+        maxResponseLength: formData.maxResponseLength,
+        promptTemplate: formData.promptTemplate,
+        customPrompts: {}
+      },
+      expertise: keywordsList.slice(0, 4),
+      metrics: {
+        totalQueries: 0,
+        successfulResolutions: 0,
+        averageResponseTime: '0s',
+        userSatisfaction: '0',
+        commonIssues: keywordsList.slice(0, 3)
+      },
+      database_backed: false
+    };
+
+    // Try to save to database
+    try {
+      const response = await fetch('http://localhost:8000/api/agents/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: formData.name,
+          role: formData.description,
+          domain: formData.domain || formData.category,
+          backstory: formData.backstory || formData.promptTemplate,
+          goal: formData.goal || `Provide excellent support for ${formData.name.toLowerCase()} related queries`,
+          keywords: keywordsList,
+          avatar: formData.avatar,
+          color: 'blue',
+          llm_config: { model: 'claude-3-5-sonnet', temperature: 0.2 },
+          tools: []
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          newAgent.database_backed = true;
+          newAgent.id = result.agent_id;
+        }
+      }
+    } catch (error) {
+      console.error('Failed to save agent to database:', error);
+    }
+
+    onSave(newAgent);
+  };
+
+  const updateEscalationRules = (rule, checked) => {
+    if (checked) {
+      setFormData(prev => ({
+        ...prev,
+        escalationRules: [...prev.escalationRules, rule]
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        escalationRules: prev.escalationRules.filter(r => r !== rule)
+      }));
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="p-6 space-y-6">
+      {/* Basic Information */}
+      <div className="space-y-4">
+        <h4 className="text-lg font-medium text-gray-900 flex items-center">
+          <Info className="w-5 h-5 mr-2 text-blue-600" />
+          Basic Information
+        </h4>
+        
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Agent Name *
+            </label>
+            <input
+              type="text"
+              value={formData.name}
+              onChange={(e) => setFormData({...formData, name: e.target.value})}
+              placeholder="e.g., Database Optimization Specialist"
+              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+                errors.name ? 'border-red-300' : 'border-gray-300'
+              }`}
+            />
+            {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Category *
+            </label>
+            <select
+              value={formData.category}
+              onChange={(e) => setFormData({...formData, category: e.target.value})}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            >
+              {categories.map(category => (
+                <option key={category} value={category}>{category}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Description *
+          </label>
+          <textarea
+            value={formData.description}
+            onChange={(e) => setFormData({...formData, description: e.target.value})}
+            placeholder="Describe what this agent specializes in and what problems it solves..."
+            rows={3}
+            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+              errors.description ? 'border-red-300' : 'border-gray-300'
+            }`}
+          />
+          {errors.description && <p className="text-red-500 text-xs mt-1">{errors.description}</p>}
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Domain *
+            </label>
+            <input
+              type="text"
+              value={formData.domain}
+              onChange={(e) => setFormData({...formData, domain: e.target.value})}
+              placeholder="e.g., Database Management"
+              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+                errors.domain ? 'border-red-300' : 'border-gray-300'
+              }`}
+            />
+            {errors.domain && <p className="text-red-500 text-xs mt-1">{errors.domain}</p>}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Avatar
+            </label>
+            <div className="flex space-x-2">
+              <select
+                value={formData.avatar}
+                onChange={(e) => setFormData({...formData, avatar: e.target.value})}
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              >
+                {availableAvatars.map(avatar => (
+                  <option key={avatar} value={avatar}>{avatar}</option>
+                ))}
+              </select>
+              <div className="w-12 h-10 border border-gray-300 rounded-lg flex items-center justify-center text-2xl">
+                {formData.avatar}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Agent Configuration */}
+      <div className="space-y-4 border-t pt-4">
+        <h4 className="text-lg font-medium text-gray-900 flex items-center">
+          <Settings className="w-5 h-5 mr-2 text-purple-600" />
+          Agent Configuration
+        </h4>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Trigger Keywords * (comma-separated)
+          </label>
+          <input
+            type="text"
+            value={formData.keywords}
+            onChange={(e) => setFormData({...formData, keywords: e.target.value})}
+            placeholder="database, SQL, optimization, performance, query, index"
+            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+              errors.keywords ? 'border-red-300' : 'border-gray-300'
+            }`}
+          />
+          {errors.keywords && <p className="text-red-500 text-xs mt-1">{errors.keywords}</p>}
+          <p className="text-xs text-gray-500 mt-1">
+            Keywords help determine when this agent should respond to queries
+          </p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Confidence Threshold: {Math.round(formData.confidenceThreshold * 100)}%
+            </label>
+            <input
+              type="range"
+              min="0.1"
+              max="1"
+              step="0.1"
+              value={formData.confidenceThreshold}
+              onChange={(e) => setFormData({...formData, confidenceThreshold: parseFloat(e.target.value)})}
+              className="w-full"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Minimum confidence required to trigger this agent
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Max Response Length
+            </label>
+            <select
+              value={formData.maxResponseLength}
+              onChange={(e) => setFormData({...formData, maxResponseLength: parseInt(e.target.value)})}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            >
+              <option value={500}>500 characters</option>
+              <option value={1000}>1,000 characters</option>
+              <option value={2000}>2,000 characters</option>
+              <option value={4000}>4,000 characters</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Escalation Rules
+          </label>
+          <div className="grid grid-cols-2 gap-2">
+            {escalationOptions.map(rule => (
+              <label key={rule} className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  checked={formData.escalationRules.includes(rule)}
+                  onChange={(e) => updateEscalationRules(rule, e.target.checked)}
+                  className="rounded text-blue-600"
+                />
+                <span className="text-sm text-gray-700 capitalize">
+                  {rule.replace('_', ' ')}
+                </span>
+              </label>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Advanced Configuration */}
+      <div className="space-y-4 border-t pt-4">
+        <h4 className="text-lg font-medium text-gray-900 flex items-center">
+          <Code className="w-5 h-5 mr-2 text-green-600" />
+          Advanced Configuration
+        </h4>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Agent Goal
+          </label>
+          <input
+            type="text"
+            value={formData.goal}
+            onChange={(e) => setFormData({...formData, goal: e.target.value})}
+            placeholder="e.g., Help users optimize database performance and resolve SQL issues"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Agent Backstory
+          </label>
+          <textarea
+            value={formData.backstory}
+            onChange={(e) => setFormData({...formData, backstory: e.target.value})}
+            placeholder="Provide context about the agent's expertise and background..."
+            rows={3}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Custom Prompt Template
+          </label>
+          <textarea
+            value={formData.promptTemplate}
+            onChange={(e) => setFormData({...formData, promptTemplate: e.target.value})}
+            placeholder="Define how this agent should behave and respond to queries..."
+            rows={4}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+      </div>
+
+      {/* Action Buttons */}
+      <div className="flex justify-end space-x-3 pt-4 border-t">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center"
+        >
+          <Save className="w-4 h-4 mr-2" />
+          Create Agent
+        </button>
+      </div>
+    </form>
+  );
+};
+
 const AgentConfiguration = () => {
   const [selectedAgent, setSelectedAgent] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -553,6 +925,33 @@ const AgentConfiguration = () => {
           )}
         </div>
       </div>
+
+      {/* Create New Agent Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-6 border-b">
+              <h3 className="text-xl font-semibold text-gray-900">
+                Create New Agent
+              </h3>
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <CreateAgentForm 
+              onCancel={() => setShowCreateModal(false)}
+              onSave={(newAgent) => {
+                setAgents(prev => [...prev, newAgent]);
+                setShowCreateModal(false);
+              }}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Edit Modal */}
       {isEditing && editForm && (
