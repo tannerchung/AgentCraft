@@ -11,7 +11,7 @@ from uuid import UUID
 from backend.enhanced_backend import enhanced_backend
 
 # Create router
-router = APIRouter(prefix="/api/agents", tags=["agents"])
+router = APIRouter(tags=["agents"])
 
 # Pydantic models for requests
 class AgentCreateRequest(BaseModel):

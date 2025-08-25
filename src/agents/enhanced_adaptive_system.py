@@ -15,7 +15,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
 from src.agents.crew_db_integration import database_crew_orchestrator, crew_agent_pool
-from database.models import metrics_manager, learning_manager
+from database.models import agent_manager, learning_manager
 from src.agents.galileo_adaptive_integration import galileo_integration
 
 logger = logging.getLogger(__name__)
@@ -306,7 +306,7 @@ class EnhancedAdaptiveSystem:
                         }
                     }
                     
-                    await metrics_manager.record_agent_performance(metrics_data)
+                    await agent_manager.record_agent_performance(metrics_data)
             
             # Record agent collaboration if multiple agents were used
             if len(agents_used) > 1:
@@ -331,7 +331,7 @@ class EnhancedAdaptiveSystem:
                         'effectiveness_score': 0.85  # Default good collaboration
                     }
                     
-                    await metrics_manager.record_agent_collaboration(collaboration_data)
+                    await agent_manager.record_agent_collaboration(collaboration_data)
         
         except Exception as e:
             logger.error(f"Error recording agent collaboration: {e}")
@@ -417,7 +417,7 @@ class EnhancedAdaptiveSystem:
             
             # Analyze agent performance and generate insights
             for agent_name, agent in agents.items():
-                performance = await metrics_manager.get_agent_performance_summary(agent.id)
+                performance = await agent_manager.get_agent_performance_summary(agent.id)
                 
                 if performance.get('total_interactions', 0) > 0:
                     # Check for performance issues

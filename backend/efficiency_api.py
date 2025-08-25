@@ -13,9 +13,9 @@ from datetime import datetime, timedelta
 
 from backend.enhanced_backend import enhanced_backend
 from src.agents.realtime_agent_tracker import realtime_tracker
-from database.models import metrics_manager, learning_manager, agent_manager
+from database.models import learning_manager, agent_manager
 
-router = APIRouter(prefix="/api/efficiency", tags=["efficiency"])
+router = APIRouter(tags=["efficiency"])
 logger = logging.getLogger(__name__)
 
 # Pydantic models
@@ -294,7 +294,7 @@ async def get_performance_insights(
         backend_metrics = await enhanced_backend.get_system_metrics()
         
         # Get query patterns
-        patterns = await metrics_manager.analyze_query_patterns(limit)
+        patterns = await agent_manager.analyze_query_patterns(limit)
         
         # Get learning insights
         insights = await learning_manager.get_pending_insights()

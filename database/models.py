@@ -277,11 +277,11 @@ class MetricsManager:
             row = await conn.fetchrow("""
                 SELECT 
                     COUNT(*) as total_interactions,
-                    AVG(response_quality) as avg_quality,
-                    AVG(response_time_ms) as avg_response_time,
-                    AVG(user_feedback_rating) as avg_user_rating,
-                    SUM(CASE WHEN success THEN 1 ELSE 0 END)::FLOAT / COUNT(*) as success_rate,
-                    AVG(cost_per_request) as avg_cost
+                    COALESCE(AVG(response_quality), 0.0) as avg_quality,
+                    COALESCE(AVG(response_time_ms), 0.0) as avg_response_time,
+                    COALESCE(AVG(user_feedback_rating), 0.0) as avg_user_rating,
+                    COALESCE(SUM(CASE WHEN success THEN 1 ELSE 0 END)::FLOAT / NULLIF(COUNT(*), 0), 0.0) as success_rate,
+                    COALESCE(AVG(cost_per_request), 0.0) as avg_cost
                 FROM agent_metrics 
                 WHERE agent_id = $1 
                 AND recorded_at > CURRENT_TIMESTAMP - INTERVAL '%s days'
@@ -363,5 +363,4 @@ class LearningManager:
 # Global database manager instance
 db_manager = DatabaseManager()
 agent_manager = AgentManager(db_manager)
-metrics_manager = MetricsManager(db_manager)
 learning_manager = LearningManager(db_manager)

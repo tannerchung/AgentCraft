@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import Dashboard from './components/Dashboard';
-import EnhancedDashboard from './components/EnhancedDashboard';
+import RealPerformanceAnalytics from './components/RealPerformanceAnalytics';
 import ABTestingDashboard from './components/ABTestingDashboard';
 import AgentChat from './components/AgentChat';
 import MultiAgentDemo from './components/MultiAgentDemo';
@@ -9,36 +8,33 @@ import KnowledgeBaseManager from './components/KnowledgeBaseManager';
 import { Activity, MessageSquare, Users, BarChart3, Zap, Settings, Database } from 'lucide-react';
 
 function App() {
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState('performance');
 
   const tabs = [
-    { id: 'dashboard', name: 'Dashboard', icon: Activity },
-    { id: 'enhanced-dashboard', name: 'Performance Analytics', icon: BarChart3 },
-    { id: 'ab-testing', name: 'A/B Testing', icon: Zap },
-    { id: 'chat', name: 'Agent Chat', icon: MessageSquare },
+    { id: 'performance', name: 'Performance Analytics', icon: BarChart3 },
     { id: 'multi-agent', name: 'Multi-Agent Demo', icon: Users },
     { id: 'knowledge', name: 'Knowledge Base', icon: Database },
     { id: 'config', name: 'Agent Configuration', icon: Settings },
+    { id: 'chat', name: 'Agent Chat', icon: MessageSquare },
+    { id: 'ab-testing', name: 'A/B Testing', icon: Zap },
   ];
 
   const renderActiveComponent = () => {
     switch (activeTab) {
-      case 'dashboard':
-        return <Dashboard />;
-      case 'enhanced-dashboard':
-        return <EnhancedDashboard />;
-      case 'ab-testing':
-        return <ABTestingDashboard />;
-      case 'chat':
-        return <AgentChat />;
+      case 'performance':
+        return <RealPerformanceAnalytics />;
       case 'multi-agent':
         return <MultiAgentDemo />;
       case 'knowledge':
         return <KnowledgeBaseManager />;
       case 'config':
         return <AgentConfiguration />;
+      case 'chat':
+        return <AgentChat />;
+      case 'ab-testing':
+        return <ABTestingDashboard />;
       default:
-        return <Dashboard />;
+        return <RealPerformanceAnalytics />;
     }
   };
 

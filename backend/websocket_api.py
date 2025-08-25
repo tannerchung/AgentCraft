@@ -16,7 +16,7 @@ from src.agents.crewai_log_streamer import crewai_log_streamer
 logger = logging.getLogger(__name__)
 
 # Create WebSocket router
-router = APIRouter(prefix="/api")
+router = APIRouter()
 
 class WebSocketManager:
     """Manages WebSocket connections for real-time updates"""
@@ -125,7 +125,7 @@ class WebSocketManager:
 # Global WebSocket manager
 ws_manager = WebSocketManager()
 
-@router.websocket("/ws/agent-tracking/{client_id}")
+@router.websocket("/agent-tracking/{client_id}")
 async def websocket_agent_tracking(websocket: WebSocket, client_id: str):
     """WebSocket endpoint for real-time agent tracking"""
     await ws_manager.connect(websocket, client_id)

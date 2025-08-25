@@ -420,7 +420,7 @@ const AgentConfiguration = () => {
 
               try {
                 // Fetch real performance metrics from database
-                const metricsResponse = await fetch(`http://localhost:8000/api/agents/${key}/metrics`);
+                const metricsResponse = await fetch(`http://localhost:8000/api/agents/${agent.id}/metrics`);
                 if (metricsResponse.ok) {
                   const metricsData = await metricsResponse.json();
                   if (metricsData.success && metricsData.metrics) {

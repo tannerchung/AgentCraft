@@ -13,7 +13,7 @@ from pathlib import Path
 # Add the parent directory to the path
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
-from database.models import agent_manager, metrics_manager, learning_manager, db_manager
+from database.models import agent_manager, learning_manager, db_manager
 from src.agents.adaptive_llm_system import AdaptiveLLMSystem
 
 logger = logging.getLogger(__name__)
@@ -180,7 +180,7 @@ class DatabaseAgentManager:
                     'total_agents_available': len(await self.get_all_agents())
                 }
             }
-            session_id = await metrics_manager.create_conversation_session(session_data)
+            session_id = await agent_manager.create_conversation_session(session_data)
             
             # Process with adaptive LLM system
             result = await self.adaptive_llm.process_multi_agent_query(
@@ -205,7 +205,7 @@ class DatabaseAgentManager:
             
             # Update session completion
             if session_id:
-                await metrics_manager.update_session_completion(
+                await agent_manager.update_session_completion(
                     session_id,
                     result.get('response', ''),
                     None  # User satisfaction will be updated separately
@@ -261,7 +261,7 @@ class DatabaseAgentManager:
                 metrics_data['cost_per_request'] = result['cost_info'].get('total_cost', 0.0)
                 metrics_data['tokens_used'] = result['cost_info'].get('total_tokens', 0)
             
-            await metrics_manager.record_agent_performance(metrics_data)
+            await agent_manager.record_agent_performance(metrics_data)
             
         except Exception as e:
             logger.error(f"Error recording agent metrics: {e}")
@@ -270,7 +270,7 @@ class DatabaseAgentManager:
         """Record user feedback for learning"""
         try:
             # Update session with user satisfaction
-            await metrics_manager.update_session_completion(
+            await agent_manager.update_session_completion(
                 UUID(session_id) if isinstance(session_id, str) else session_id,
                 None,  # Don't update final_response
                 rating
@@ -341,7 +341,7 @@ class DatabaseAgentManager:
             
             # Get performance for each agent
             for agent_name, agent in agents.items():
-                agent_summary = await metrics_manager.get_agent_performance_summary(
+                agent_summary = await agent_manager.get_agent_performance_summary(
                     agent['id'], days=30
                 )
                 summary['agent_performance'][agent_name] = agent_summary

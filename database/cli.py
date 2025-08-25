@@ -15,7 +15,7 @@ from uuid import UUID
 # Add parent directory to path
 sys.path.append(str(Path(__file__).parent.parent))
 
-from database.models import db_manager, agent_manager, metrics_manager, learning_manager
+from database.models import db_manager, agent_manager, learning_manager
 
 class AgentCraftCLI:
     """Command-line interface for AgentCraft database management"""
@@ -56,7 +56,7 @@ class AgentCraftCLI:
                 print(f"❌ Agent '{agent_name}' not found")
                 return
             
-            performance = await metrics_manager.get_agent_performance_summary(agent['id'], days)
+            performance = await agent_manager.get_agent_performance_summary(agent['id'], days)
             
             print(f"\n📊 Performance Report: {agent['name']} (Last {days} days)")
             print("=" * 60)
@@ -89,7 +89,7 @@ class AgentCraftCLI:
             # Show top 5 agents by interaction count
             performances = []
             for agent in agents[:5]:  # Limit to first 5 for demo
-                perf = await metrics_manager.get_agent_performance_summary(agent['id'], days)
+                perf = await agent_manager.get_agent_performance_summary(agent['id'], days)
                 if perf.get('total_interactions', 0) > 0:
                     performances.append((agent['name'], perf))
             
@@ -144,7 +144,7 @@ class AgentCraftCLI:
     
     async def query_patterns(self, limit: int = 10):
         """Show query patterns analysis"""
-        patterns = await metrics_manager.analyze_query_patterns(limit)
+        patterns = await agent_manager.analyze_query_patterns(limit)
         
         print(f"\n🔍 Query Patterns Analysis (Top {limit})")
         print("=" * 80)
