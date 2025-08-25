@@ -102,42 +102,71 @@ class QdrantService:
         except Exception as e:
             logging.error(f"Failed to initialize collection: {e}")
     
-    def generate_mock_knowledge_base(self) -> List[KnowledgeArticle]:
-        """Generate mock HubSpot-style support articles for demo"""
+    def generate_mock_knowledge_base(self, company_context: Dict[str, Any] = None) -> List[KnowledgeArticle]:
+        """Generate mock support articles for the target company"""
+        
+        # Import here to avoid circular imports
+        try:
+            from .target_company_service import target_company_service
+            current_company = target_company_service.get_current_company()
+            company_name = current_company.display_name
+            focus_areas = current_company.technical_focus_areas
+            pain_points = current_company.customer_pain_points
+        except ImportError:
+            company_name = "Zapier"
+            focus_areas = ["webhook", "api", "integration"]
+            pain_points = ["signature verification", "rate limiting"]
+        
         articles = [
-            # Webhook-related articles
+            # Zapier Integration-related articles
             KnowledgeArticle(
                 id="kb_001",
-                title="Webhook Signature Verification Guide",
-                content="""
-                Complete guide to implementing webhook signature verification for API v2.1.3.
+                title=f"{company_name} Webhook Signature Verification Guide",
+                content=f"""
+                Complete guide to implementing webhook signature verification for {company_name} Platform API v2.1.3.
                 
                 Common Issues:
-                - 403 Forbidden errors after API upgrade
-                - HMAC signature mismatches
-                - Header case sensitivity changes
+                - 403 Forbidden errors after platform API upgrade
+                - HMAC signature mismatches in {company_name} webhooks
+                - Header case sensitivity changes in new API version
+                - Integration authentication failures
                 
-                Solution:
-                1. Verify you're using the correct header names (lowercase in v2.1.3)
-                2. Include sha256= prefix in signature format
+                Solution for {company_name} Platform:
+                1. Verify you're using the correct header names (x-{company_name.lower()}-signature)
+                2. Include sha256= prefix in signature format per {company_name} standards
                 3. Use constant-time comparison for security
+                4. Handle webhook retries properly
                 
-                Code Example:
+                {company_name} Code Example:
                 ```python
                 import hmac
                 import hashlib
                 
-                def verify_signature(payload, signature, secret):
+                def verify_{company_name.lower()}_signature(payload, signature, secret):
                     expected = hmac.new(
                         secret.encode(),
                         payload.encode(),
                         hashlib.sha256
                     ).hexdigest()
-                    return hmac.compare_digest(f"sha256={expected}", signature)
+                    return hmac.compare_digest(f"sha256={{expected}}", signature)
+                
+                # {company_name}-specific webhook handling
+                def handle_{company_name.lower()}_webhook(request):
+                    signature = request.headers.get('X-{company_name}-Signature')
+                    if not verify_{company_name.lower()}_signature(request.body, signature, WEBHOOK_SECRET):
+                        return {'error': 'Invalid signature'}, 403
+                    
+                    # Process {company_name} event
+                    return process_automation_event(request.json)
                 ```
+                
+                {company_name} Platform Specific Notes:
+                - Use HTTPS endpoints only for production integrations
+                - Implement exponential backoff for webhook retries
+                - Handle {company_name}'s rate limiting appropriately
                 """,
                 category="Technical Integration",
-                tags=["webhook", "signature", "security", "api", "v2.1.3"],
+                tags=["webhook", "signature", "security", "api", "zapier", "automation"],
                 created_at="2024-01-15T10:00:00Z",
                 updated_at="2024-08-20T14:30:00Z"
             ),

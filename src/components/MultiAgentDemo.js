@@ -169,9 +169,24 @@ const MessageContent = ({ content }) => {
 
 const MultiAgentDemo = () => {
   // Chat state (customer view)
-  const [messages, setMessages] = useState([]);
+  const [messages, setMessages] = useState([
+    {
+      id: 1,
+      type: 'assistant',
+      content: 'Hello! I\'m your AgentCraft assistant. I can demonstrate multi-agent collaboration with specialized knowledge routing. Try asking about webhooks, competitive analysis, or technical integrations!',
+      timestamp: new Date().toLocaleTimeString()
+    }
+  ]);
   const [inputMessage, setInputMessage] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // Target Company Selection State
+  const [targetCompany, setTargetCompany] = useState('zapier');
+  const [availableCompanies, setAvailableCompanies] = useState({
+    zapier: { name: 'Zapier', emoji: '⚡', color: 'orange' },
+    hubspot: { name: 'HubSpot', emoji: '🧲', color: 'orange' },
+    shopify: { name: 'Shopify', emoji: '🛍️', color: 'green' }
+  });
 
   // Debug console state
   const [debugLogs, setDebugLogs] = useState([]);
@@ -649,19 +664,26 @@ const MultiAgentDemo = () => {
         // Generate session ID for tracking
         const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-        // Call the real backend API that uses CrewAI
-        const response = await axios.post('http://localhost:8000/api/chat', {
-          agent_type: 'multi-agent',
-          message: userMessage.content,
-          context: {
-            orchestration_mode: true,
-            debug_enabled: true,
-            tracking_session_id: sessionId,
-            websocket_client_id: clientId.current
-          }
+        // Make API call to backend with company context
+        const response = await fetch('http://localhost:8000/api/chat', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            message: userMessage.content,
+            agent_type: 'orchestrator',
+            target_company: targetCompany,
+            company_context: availableCompanies[targetCompany]
+          })
         });
 
-          const result = response.data;
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+
+          const result = await response.json();
+
 
           // Log backend agent activity
           if (result.agent_info) {
@@ -750,72 +772,6 @@ const MultiAgentDemo = () => {
       setActiveAgents([]);
     }
   };
-
-  // Simulation logic (extracted for reuse) - currently unused but kept for future simulation mode
-  /*
-  const runSimulation = async (userMessage) => {
-    // Step 1: Agent Selection
-    const selectedAgents = selectAgents(userMessage.content);
-    setActiveAgents(selectedAgents);
-    setCurrentQueryAgents(selectedAgents);
-
-    addDebugLog('routing', 'orchestrator', 
-      `Selected ${selectedAgents.length} agents: ${selectedAgents.map(id => agentLibrary[id].name).join(', ')}`
-    );
-
-    // Step 2: Parallel Agent Processing (simulation)
-    const agentPromises = selectedAgents.map(agentId => 
-      processWithAgent(agentId, userMessage.content, {})
-    );
-
-    const analyses = await Promise.all(agentPromises);
-
-    // Store analyses
-    const analysisMap = {};
-    selectedAgents.forEach((agentId, index) => {
-      analysisMap[agentId] = analyses[index];
-    });
-    setAgentAnalysis(analysisMap);
-
-    // Check for escalation
-    const needsEscalation = analyses.some(a => a.requiresEscalation);
-    if (needsEscalation && Math.random() > 0.7) { // 30% chance for demo
-      triggerHitlEscalation(
-        "Complex security issue detected requiring human expertise",
-        analysisMap
-      );
-      setIsProcessing(false);
-      return;
-    }
-
-    // Step 3: Response Synthesis
-    addDebugLog('synthesis', 'orchestrator', 'Synthesizing agent responses...');
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    // Generate final response
-    const finalResponse = generateCustomerResponse(analysisMap);
-
-    const assistantMessage = {
-      id: Date.now() + 1,
-      type: 'assistant',
-      content: finalResponse,
-      timestamp: new Date().toLocaleTimeString(),
-      metadata: {
-        source: 'simulation',
-        agents_used: selectedAgents,
-        confidence: 0.92,
-        processing_time: '3.2s',
-        real_crewai: false
-      }
-    };
-
-    setMessages(prev => [...prev, assistantMessage]);
-
-    addDebugLog('complete', 'system', 
-      `Simulated response delivered (${selectedAgents.length} agents, 3.2s total)`
-    );
-  };
-  */
 
   // Generate customer service response from agent analyses
   const generateCustomerResponse = (analysisMap) => {
@@ -909,7 +865,14 @@ const MultiAgentDemo = () => {
     setConversationActive(false);
     setCurrentQueryAgents([]);
     setActiveAgents([]);
-    setMessages([]);
+    setMessages([
+        {
+          id: 1,
+          type: 'assistant',
+          content: 'Hello! I\'m your AgentCraft assistant. I can demonstrate multi-agent collaboration with specialized knowledge routing. Try asking about webhooks, competitive analysis, or technical integrations!',
+          timestamp: new Date().toLocaleTimeString()
+        }
+      ]); // Reset to initial greeting
     setAgentAnalysis({});
     setDebugLogs([]);
     setShowHitl(false);
@@ -963,25 +926,48 @@ const MultiAgentDemo = () => {
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900 flex items-center">
-            <Users className="w-8 h-8 mr-3 text-blue-600" />
-            Multi-Agent Orchestration Demo
-            <div className={`ml-4 flex items-center text-sm px-3 py-1 rounded-full ${
-              connectionStatus === 'connected' ? 'bg-green-100 text-green-700' :
-              connectionStatus === 'error' ? 'bg-red-100 text-red-700' :
-              'bg-yellow-100 text-yellow-700'
-            }`}>
-              <div className={`w-2 h-2 rounded-full mr-2 ${
-                connectionStatus === 'connected' ? 'bg-green-500' :
-                connectionStatus === 'error' ? 'bg-red-500' :
-                'bg-yellow-500'
-              }`}></div>
-              Real-time {connectionStatus}
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 flex items-center">
+                <Users className="w-8 h-8 mr-3 text-blue-600" />
+                Multi-Agent Orchestration Demo
+                <div className={`ml-4 flex items-center text-sm px-3 py-1 rounded-full ${
+                  connectionStatus === 'connected' ? 'bg-green-100 text-green-700' :
+                  connectionStatus === 'error' ? 'bg-red-100 text-red-700' :
+                  'bg-yellow-100 text-yellow-700'
+                }`}>
+                  <div className={`w-2 h-2 rounded-full mr-2 ${
+                    connectionStatus === 'connected' ? 'bg-green-500' :
+                    connectionStatus === 'error' ? 'bg-red-500' :
+                    'bg-yellow-500'
+                  }`}></div>
+                  Real-time {connectionStatus}
+                </div>
+              </h1>
+              <p className="text-gray-600 mt-2">
+                Experience CrewAI-powered agent coordination with live WebSocket updates, debug transparency and HITL capabilities
+              </p>
             </div>
-          </h1>
-          <p className="text-gray-600 mt-2">
-            Experience CrewAI-powered agent coordination with live WebSocket updates, debug transparency and HITL capabilities
-          </p>
+
+            {/* Target Company Selection */}
+            <div className="flex items-center space-x-4">
+              <label className="text-sm font-medium text-gray-700">Target Company:</label>
+              <select
+                value={targetCompany}
+                onChange={(e) => setTargetCompany(e.target.value)}
+                className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                {Object.entries(availableCompanies).map(([id, company]) => (
+                  <option key={id} value={id}>
+                    {company.emoji} {company.name}
+                  </option>
+                ))}
+              </select>
+              <div className="text-xs text-gray-500">
+                Context: {availableCompanies[targetCompany].name} Integration Platform
+              </div>
+            </div>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
