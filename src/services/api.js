@@ -1,4 +1,3 @@
-
 import axios from 'axios';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
@@ -25,11 +24,11 @@ class ApiService {
           demo_mode: false
         }
       });
-      
+
       // Process the real AI response
       if (response.data.success && response.data.response) {
         let processedMessage = '';
-        
+
         // Check if we have formatted content from backend
         if (response.data.response.content && response.data.response.content.startsWith('**')) {
           processedMessage = response.data.response.content;
@@ -46,7 +45,7 @@ class ApiService {
             if (jsonStart !== -1 && jsonEnd > jsonStart) {
               const jsonStr = response.data.response.content.substring(jsonStart, jsonEnd);
               const parsed = JSON.parse(jsonStr);
-              
+
               // Format the JSON into readable markdown
               processedMessage = `**Technical Diagnosis:**
 ${parsed.diagnosis || 'Analysis provided'}
@@ -84,7 +83,7 @@ ${parsed.prevention || 'Prevention strategies provided'}
         else if (response.data.response.content) {
           try {
             const parsed = JSON.parse(response.data.response.content);
-            
+
             // Format the JSON into readable markdown
             processedMessage = `**Technical Diagnosis:**
 ${parsed.diagnosis || 'Analysis provided'}
@@ -123,7 +122,7 @@ ${parsed.prevention || 'Prevention strategies provided'}
         else {
           processedMessage = "AI response received but couldn't parse content";
         }
-        
+
         return {
           message: processedMessage,
           confidence: 0.95,
@@ -132,11 +131,11 @@ ${parsed.prevention || 'Prevention strategies provided'}
           competitiveAdvantage: response.data.competitive_advantage
         };
       }
-      
+
       return response.data;
     } catch (error) {
       console.error('API Error:', error);
-      
+
       // Return error message instead of mock data
       return {
         message: `I'm experiencing technical difficulties connecting to the AI system. Error: ${error.message}. Please ensure the backend server is running on localhost:8000.`,
@@ -189,32 +188,137 @@ ${parsed.prevention || 'Prevention strategies provided'}
   getMockResponse(agentType, message) {
     const responses = {
       technical: {
-        message: `I understand you're experiencing technical issues. Based on my specialized knowledge of ${this.extractTechnicalTerms(message).join(', ')}, here's my analysis:
+        message: `🔧 **Technical Analysis Complete**
 
-🔍 **Technical Diagnosis:**
-- This appears to be a common issue with webhook implementations
-- The root cause is likely related to SSL certificate validation or authentication headers
+Thank you for reporting this webhook integration issue. I've analyzed your problem and here's my expert assessment:
 
-💡 **Recommended Solution:**
-1. Verify your SSL certificate chain is complete
-2. Check HMAC signature generation algorithm
-3. Implement proper retry logic with exponential backoff
+## **Issue Diagnosis**
+**403 Errors & SSL Certificate Issues**
+- Authentication signature mismatch (likely HMAC verification failure)
+- SSL certificate chain validation problems
+- Possible API version incompatibility
 
-📝 **Code Example:**
+## **Root Cause Analysis**
+1. **Authentication Layer**: HMAC signature algorithm may have changed in recent API updates
+2. **SSL Layer**: Certificate chain incomplete or expired intermediate certificates
+3. **Configuration**: Webhook endpoint URL or headers misconfigured
+
+## **Detailed Action Steps**
+
+### **Immediate Actions (0-30 minutes)**
+1. **Verify Webhook URL Configuration**
+   - Check endpoint URL format: \`https://your-domain.com/webhook\`
+   - Ensure HTTPS is properly configured
+   - Test with curl: \`curl -I https://your-webhook-endpoint.com\`
+
+2. **Check Authentication Headers**
+   - Verify X-Signature header format
+   - Confirm secret key hasn't changed
+   - Test HMAC generation algorithm
+
+3. **SSL Certificate Inspection**
+   - Run: \`openssl s_client -connect your-domain.com:443 -showcerts\`
+   - Check certificate expiration dates
+   - Verify complete certificate chain
+
+### **Implementation Steps (30-60 minutes)**
+
+**Step 1: Update HMAC Verification**
 \`\`\`python
 import hmac
 import hashlib
+import base64
 
 def verify_webhook_signature(payload, signature, secret):
+    # Updated for API v2.1.3+
     expected = hmac.new(
         secret.encode('utf-8'),
         payload.encode('utf-8'),
         hashlib.sha256
     ).hexdigest()
-    return hmac.compare_digest(signature, expected)
+
+    # Handle both formats: "sha256=hash" and "hash"
+    if signature.startswith('sha256='):
+        signature = signature[7:]
+
+    return hmac.compare_digest(expected, signature)
 \`\`\`
 
-This specialized analysis draws from my deep technical knowledge of webhook implementations and common integration patterns.`,
+**Step 2: SSL Certificate Fix**
+\`\`\`python
+import requests
+import ssl
+
+# Option 1: Update certificate bundle
+response = requests.post(
+    webhook_url,
+    json=payload,
+    verify='/path/to/updated-ca-bundle.crt'
+)
+
+# Option 2: For development only - disable verification
+# response = requests.post(webhook_url, json=payload, verify=False)
+\`\`\`
+
+**Step 3: Implement Retry Logic**
+\`\`\`python
+import time
+import random
+
+def send_webhook_with_retry(url, payload, max_retries=3):
+    for attempt in range(max_retries):
+        try:
+            response = requests.post(
+                url, 
+                json=payload, 
+                timeout=(5, 30),
+                verify=True
+            )
+            if response.status_code == 200:
+                return response
+        except (requests.exceptions.SSLError, 
+                requests.exceptions.Timeout) as e:
+            if attempt == max_retries - 1:
+                raise
+            # Exponential backoff
+            time.sleep(2 ** attempt + random.uniform(0, 1))
+
+    raise Exception("Max retries exceeded")
+\`\`\`
+
+### **Testing & Verification (15-30 minutes)**
+1. **Unit Test the Signature**
+   \`\`\`bash
+   python -c "import your_webhook_module; your_webhook_module.test_signature_verification()"
+   \`\`\`
+
+2. **SSL Connectivity Test**
+   \`\`\`bash
+   curl -v https://your-webhook-endpoint.com/test
+   \`\`\`
+
+3. **End-to-End Webhook Test**
+   - Send test webhook from your platform
+   - Monitor server logs for 403/SSL errors
+   - Verify successful payload delivery
+
+### **Monitoring & Prevention**
+- Set up certificate expiration alerts
+- Implement webhook delivery status tracking
+- Add logging for authentication failures
+
+## **Expected Resolution Time**
+- **Immediate fix**: 1-2 hours
+- **Complete implementation**: 2-4 hours
+- **Testing & verification**: 30 minutes
+
+## **Success Metrics**
+- ✅ 403 errors eliminated
+- ✅ SSL handshake successful
+- ✅ Webhook delivery rate > 99%
+- ✅ Response time < 2 seconds
+
+This analysis leverages my specialized expertise in webhook implementations, API authentication, and SSL certificate management to provide actionable solutions for your specific integration challenges.`,
         confidence: Math.random() * 0.2 + 0.8
       },
       billing: {
