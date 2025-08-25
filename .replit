@@ -16,7 +16,7 @@ run = ["python3", "main.py"]
 deploymentTarget = "cloudrun"
 
 [workflows]
-runButton = "Start React Development"
+runButton = "Frontend Server Only"
 
 [[workflows.workflow]]
 name = "Start React Development"
