@@ -17,3 +17,5 @@ python-multipart>=0.0.6
 
 # Optional: OpenAI alternative
 # openai-python>=0.27.0
+galileo
+galileo
